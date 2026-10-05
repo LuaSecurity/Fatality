@@ -65,6 +65,10 @@ export type Elements = {
 	AddIntInput: (self,Config: IntInput) -> {
 		Option: Elements	
 	},
+	AddTextInput: (self,Config: TextInput) -> {
+		Option: Elements	
+	},
+	AddLabel: (self,Config: Label) -> {},
 }
 
 export type IntInput = {
@@ -76,6 +80,25 @@ export type IntInput = {
 	Callback: (number) -> any,
 	Risky: boolean?,
 	Option: boolean?,
+	Flag: string | nil,
+}
+
+export type TextInput = {
+	Name: string,
+	Default: string,
+	Placeholder: (string)?,
+	MaxLength: number?,
+	Callback: (string) -> any,
+	Risky: boolean?,
+	Option: boolean?,
+	Flag: string | nil,
+}
+
+export type Label = {
+	Text: string,
+	Name: string?,
+	Size: number?,
+	Color: Color3?,
 	Flag: string | nil,
 }
 
@@ -2973,6 +2996,291 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 
 		if Config.Flag then
 			Fatality.WindowFlags[FatalWindow][Config.Flag.."IntInput"] = Respons;
+		end;
+
+		return Respons;
+	end;
+
+	function elements:AddTextInput(Config: TextInput)
+		Config = Config or {};
+		Config.Name = Config.Name or "TextInput";
+		Config.Default = (type(Config.Default) == "string" and Config.Default) or "";
+		Config.Placeholder = Config.Placeholder or Config.Default;
+		Config.MaxLength = Config.MaxLength or 32;
+		Config.Risky = Config.Risky or false;
+		Config.Option = Config.Option or false;
+		Config.Callback = Config.Callback or function(val) end;
+		Config.Flag = Config.Flag or nil;
+
+		local function sanitize(val)
+			local s = tostring(val or "");
+			if #s > Config.MaxLength then s = s:sub(1, Config.MaxLength); end;
+			return s;
+		end;
+
+		Config.Default = sanitize(Config.Default);
+
+		local TextInput = Instance.new("Frame")
+		local TextInput_Name = Instance.new("TextLabel")
+		local ValueFrame = Instance.new("Frame")
+		local UICorner = Instance.new("UICorner")
+		local OptionButton = Instance.new("ImageButton")
+		local TextBox = Instance.new("TextBox")
+
+		if SearchAPI then
+			SearchAPI.Memory(Config.Name);
+		end;
+
+		TextInput.Name = Fatality:RandomString()
+		TextInput.Parent = Parent
+		TextInput.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		TextInput.BackgroundTransparency = 1.000
+		TextInput.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		TextInput.BorderSizePixel = 0
+		TextInput.Size = UDim2.new(1, -25, 0, 17)
+		TextInput.ZIndex = ZIndex + 1
+		Fatality:AddDragBlacklist(TextInput);
+
+		TextInput_Name.Name = Fatality:RandomString()
+		TextInput_Name.Parent = TextInput
+		TextInput_Name.AnchorPoint = Vector2.new(0, 0.5)
+		TextInput_Name.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		TextInput_Name.BackgroundTransparency = 1.000
+		TextInput_Name.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		TextInput_Name.BorderSizePixel = 0
+		TextInput_Name.Position = UDim2.new(0, 0, 0.5, 0)
+		TextInput_Name.Size = UDim2.new(1, (Config.Option and -95) or -75, 0.800000012, 0)
+		TextInput_Name.ZIndex = ZIndex + 2
+		TextInput_Name.FontFace = Fatality.FontSemiBold
+		TextInput_Name.Text = Config.Name
+		TextInput_Name.TextColor3 = (Config.Risky and Color3.fromRGB(255, 160, 92)) or Color3.fromRGB(255, 255, 255)
+		TextInput_Name.TextSize = 13.000
+		TextInput_Name.TextTransparency = 0.200
+		TextInput_Name.TextXAlignment = Enum.TextXAlignment.Left
+		TextInput_Name.TextTruncate = Enum.TextTruncate.AtEnd
+		Fatality:ProtectText(TextInput_Name,Config.Name);
+
+		ValueFrame.Name = Fatality:RandomString()
+		ValueFrame.Parent = TextInput
+		ValueFrame.AnchorPoint = Vector2.new(1, 0.5)
+		ValueFrame.BackgroundColor3 = Fatality.Colors.Black
+		ValueFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		ValueFrame.BorderSizePixel = 0
+		ValueFrame.ClipsDescendants = true
+		ValueFrame.Position = UDim2.new(1, -3, 0.5, 0)
+		ValueFrame.Size = UDim2.new(0, 90, 0.850000024, 0)
+		ValueFrame.ZIndex = ZIndex + 2
+
+		UICorner.CornerRadius = UDim.new(0, 2)
+		UICorner.Parent = ValueFrame
+
+		OptionButton.Name = Fatality:RandomString()
+		OptionButton.Parent = ValueFrame
+		OptionButton.AnchorPoint = Vector2.new(0, 0.5)
+		OptionButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		OptionButton.BackgroundTransparency = 1.000
+		OptionButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		OptionButton.BorderSizePixel = 0
+		OptionButton.Position = UDim2.new(0, -20, 0.5, 0)
+		OptionButton.Size = UDim2.new(0, 13, 0, 13)
+		OptionButton.SizeConstraint = Enum.SizeConstraint.RelativeYY
+		OptionButton.Image = "http://www.roblox.com/asset/?id=14007344336"
+		OptionButton.ImageTransparency = 0.600
+		OptionButton.Visible = Config.Option or false;
+		OptionButton.ZIndex = ZIndex + 1;
+
+		TextBox.Name = Fatality:RandomString()
+		TextBox.Parent = ValueFrame
+		TextBox.AnchorPoint = Vector2.new(0.5, 0.5)
+		TextBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		TextBox.BackgroundTransparency = 1.000
+		TextBox.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		TextBox.BorderSizePixel = 0
+		TextBox.Position = UDim2.new(0.5, 0, 0.5, 0)
+		TextBox.Size = UDim2.new(1, -6, 1, 0)
+		TextBox.ZIndex = ZIndex + 3
+		TextBox.ClearTextOnFocus = false
+		TextBox.FontFace = Fatality.FontSemiBold
+		TextBox.PlaceholderText = tostring(Config.Placeholder or Config.Default)
+		TextBox.Text = tostring(Config.Default)
+		TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+		TextBox.TextSize = 10.000
+		TextBox.TextStrokeTransparency = 0.850
+		TextBox.TextTransparency = 0.200
+		TextBox.TextXAlignment = Enum.TextXAlignment.Center
+
+		TextBox:GetPropertyChangedSignal("Text"):Connect(function()
+			local txt = TextBox.Text;
+			if #txt > Config.MaxLength then
+				TextBox.Text = txt:sub(1, Config.MaxLength);
+			end;
+		end);
+
+		local function commit()
+			local val = sanitize(TextBox.Text);
+			if val == "" then
+				TextBox.Text = tostring(Config.Default);
+				return;
+			end;
+			local isSame = Config.Default == val;
+			Config.Default = val;
+			TextBox.Text = val;
+			if not isSame then
+				Config.Callback(val);
+			end;
+		end;
+
+		TextBox.FocusLost:Connect(function()
+			commit();
+		end);
+
+		local OpcToggle = function(value)
+			if value then
+				TextBox.Visible = true
+				Fatality:CreateAnimation(TextInput_Name,0.45,{
+					TextTransparency = 0.2,
+				})
+
+				Fatality:CreateAnimation(ValueFrame,0.45,{
+					BackgroundTransparency = 0
+				})
+
+				Fatality:CreateAnimation(TextBox,0.45,{
+					TextStrokeTransparency = 0.850,
+					TextTransparency = 0.200
+				})
+
+				Fatality:CreateAnimation(OptionButton,0.45,{
+					ImageTransparency = (Config.Option and 0.6) or 1,
+				})
+			else
+				TextBox.Visible = false
+				Fatality:CreateAnimation(TextInput_Name,0.45,{
+					TextTransparency = 1,
+				})
+
+				Fatality:CreateAnimation(ValueFrame,0.45,{
+					BackgroundTransparency = 1
+				})
+
+				Fatality:CreateAnimation(TextBox,0.45,{
+					TextStrokeTransparency = 1,
+					TextTransparency = 1
+				})
+
+				Fatality:CreateAnimation(OptionButton,0.45,{
+					ImageTransparency = 1,
+				})
+			end;
+		end;
+
+		OpcToggle(Event:GetAttribute('V'));
+
+		local Respons = Fatality:CreateResponse({
+			Rename = function(new_name)
+				TextInput_Name.Text = new_name
+				Fatality:ProtectText(TextInput_Name,new_name);
+			end,
+			GetValue = function()
+				return Config.Default;
+			end,
+			Signal = Event.Event:Connect(OpcToggle),
+			SetValue = function(def)
+				local val = sanitize(def);
+				if val == "" then return; end;
+				local IsSame = Config.Default == val;
+
+				Config.Default = val;
+				TextBox.Text = val;
+
+				if not IsSame then
+					Config.Callback(Config.Default);
+				end;
+			end,
+			Flag = Config.Flag and Config.Flag.."TextInput",
+			Option = (Config.Option and Fatality:CreateOption(OptionButton)) or nil,
+		});
+
+		if Config.Flag then
+			Fatality.WindowFlags[FatalWindow][Config.Flag.."TextInput"] = Respons;
+		end;
+
+		return Respons;
+	end;
+
+	function elements:AddLabel(Config: Label)
+		Config = Config or {};
+		Config.Text = Config.Text or Config.Name or "Label";
+		Config.Size = Config.Size or 12;
+		Config.Color = Config.Color or Color3.fromRGB(255, 255, 255);
+		Config.Flag = Config.Flag or nil;
+
+		local Label = Instance.new("Frame")
+		local Label_Text = Instance.new("TextLabel")
+
+		if SearchAPI then
+			SearchAPI.Memory(tostring(Config.Text):sub(1, 24));
+		end;
+
+		Label.Name = Fatality:RandomString()
+		Label.Parent = Parent
+		Label.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		Label.BackgroundTransparency = 1.000
+		Label.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		Label.BorderSizePixel = 0
+		Label.Size = UDim2.new(1, -25, 0, 15)
+		Label.ZIndex = ZIndex + 1
+		Fatality:AddDragBlacklist(Label);
+
+		Label_Text.Name = Fatality:RandomString()
+		Label_Text.Parent = Label
+		Label_Text.AnchorPoint = Vector2.new(0, 0.5)
+		Label_Text.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		Label_Text.BackgroundTransparency = 1.000
+		Label_Text.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		Label_Text.BorderSizePixel = 0
+		Label_Text.Position = UDim2.new(0, 0, 0.5, 0)
+		Label_Text.Size = UDim2.new(1, 0, 1, 0)
+		Label_Text.ZIndex = ZIndex + 2
+		Label_Text.FontFace = Fatality.FontSemiBold
+		Label_Text.TextColor3 = Config.Color
+		Label_Text.TextSize = Config.Size
+		Label_Text.TextTransparency = 0.200
+		Label_Text.TextXAlignment = Enum.TextXAlignment.Left
+		Label_Text.TextTruncate = Enum.TextTruncate.AtEnd
+		Fatality:ProtectText(Label_Text,Config.Text);
+
+		local OpcToggle = function(value)
+			if value then
+				Label_Text.Visible = true
+				Fatality:CreateAnimation(Label_Text,0.45,{
+					TextTransparency = 0.2,
+				})
+			else
+				Label_Text.Visible = false
+				Fatality:CreateAnimation(Label_Text,0.45,{
+					TextTransparency = 1,
+				})
+			end;
+		end;
+
+		OpcToggle(Event:GetAttribute('V'));
+
+		local Respons = Fatality:CreateResponse({
+			SetText = function(txt)
+				Config.Text = tostring(txt);
+				Label_Text.Text = tostring(txt);
+				Fatality:ProtectText(Label_Text,tostring(txt));
+			end,
+			GetValue = function()
+				return Config.Text;
+			end,
+			Signal = Event.Event:Connect(OpcToggle),
+			Flag = Config.Flag and Config.Flag.."Label",
+		});
+
+		if Config.Flag then
+			Fatality.WindowFlags[FatalWindow][Config.Flag.."Label"] = Respons;
 		end;
 
 		return Respons;
