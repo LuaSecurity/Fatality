@@ -310,9 +310,12 @@ local RunService = cloneref(game:GetService('RunService'));
 local Players = cloneref(game:GetService('Players'));
 local UserInputService = cloneref(game:GetService('UserInputService'));
 local Client = Players.LocalPlayer;
--- Mouse position via getmouselocation() only. No GetMouse() anywhere.
+-- Mouse position via UserInputService only: same screen space the old
+-- Mouse.X/Y reads used, but no GetMouse() object and no executor function.
 local function MousePosition()
-	local ok, pos = pcall(getmouselocation);
+	local ok, pos = pcall(function()
+		return UserInputService:GetMouseLocation();
+	end);
 	if ok and typeof(pos) == "Vector2" then return pos; end;
 	return Vector2.zero;
 end;
