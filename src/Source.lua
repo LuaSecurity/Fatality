@@ -187,8 +187,24 @@ getgenv = getgenv or getfenv;
 protect_gui = protect_gui or protectgui or (syn and syn.protect_gui) or function() end;
 getgenv().LPH_NO_VIRTUALIZE = LPH_NO_VIRTUALIZE or function(f) return f end;
 
-if game:GetService('RunService'):IsStudio() then
-	local BaseWorkspace = Instance.new('Folder',game:GetService("ReplicatedFirst"));
+-- Every service handle goes through cloneref (cached, guarded).
+local _svcCache = {};
+local function svc(name)
+	if _svcCache[name] ~= nil then return _svcCache[name]; end;
+	local inst = nil;
+	pcall(function() inst = game:GetService(name); end);
+	if inst ~= nil then
+		pcall(function()
+			local c = cloneref(inst);
+			if c ~= nil then inst = c; end;
+		end);
+	end;
+	if inst ~= nil then _svcCache[name] = inst; end;
+	return inst;
+end;
+
+if svc('RunService') and svc('RunService'):IsStudio() then
+	local BaseWorkspace = Instance.new('Folder',svc("ReplicatedFirst"));
 
 	BaseWorkspace.Name = "WORKSPACE";
 
@@ -308,12 +324,13 @@ if game:GetService('RunService'):IsStudio() then
 end;
 
 -- Services --
-local TextService = cloneref(game:GetService('TextService'));
-local TweenService = cloneref(game:GetService('TweenService'));
-local RunService = cloneref(game:GetService('RunService'));
-local Players = cloneref(game:GetService('Players'));
-local UserInputService = cloneref(game:GetService('UserInputService'));
-local Client = Players.LocalPlayer;
+local TextService = svc('TextService');
+local TweenService = svc('TweenService');
+local RunService = svc('RunService');
+local Players = svc('Players');
+local UserInputService = svc('UserInputService');
+local Workspace = svc('Workspace');
+local Client = Players and Players.LocalPlayer;
 -- Mouse position in VIEWPORT space (what AbsolutePosition uses, since every
 -- lib ScreenGui sets IgnoreGuiInset). GetMouseLocation() includes the topbar
 -- inset (~36px) while AbsolutePosition excludes it — comparing them raw
@@ -326,7 +343,7 @@ local function MousePosition()
 	end);
 	if ok and typeof(pos) == "Vector2" then
 		local okI, inset = pcall(function()
-			return game:GetService("GuiService"):GetGuiInset();
+			return svc("GuiService"):GetGuiInset();
 		end);
 		if okI and typeof(inset) == "Vector2" then
 			return pos - inset;
@@ -335,9 +352,12 @@ local function MousePosition()
 	end;
 	return Vector2.zero;
 end;
-local CurrentCamera = workspace.CurrentCamera;
+local CurrentCamera = Workspace and Workspace.CurrentCamera;
 local _,CoreGui = xpcall(function()
-	return (gethui and gethui()) or game:GetService("CoreGui"):FindFirstChild("RobloxGui");
+	return (gethui and gethui()) or (function()
+		local cg = svc("CoreGui");
+		return cg and cg:FindFirstChild("RobloxGui");
+	end)();
 end,function()
 	return Client.PlayerGui;
 end);
@@ -3677,7 +3697,7 @@ function Fatality:CreateConfigWindow(Root: ScreenGui , Fatal , Button: ImageButt
 		end;
 	end);
 
-	game:GetService('UserInputService').InputBegan:Connect(function(Input,Typing)
+	UserInputService.InputBegan:Connect(function(Input,Typing)
 		if Input.UserInputType == Enum.UserInputType.Touch or Input.UserInputType == Enum.UserInputType.MouseButton1 then
 			if UIToggle and not Fatality:IsMouseOverFrame(ConfigWindowFrame) then
 				ElementToggle(false);
@@ -3800,7 +3820,7 @@ function Fatality:CreateConfigWindow(Root: ScreenGui , Fatal , Button: ImageButt
 			local path = res.ConfigDirectory..'/'..tostring(name);
 
 			if isfile(path) then
-				local decoded = game:GetService('HttpService'):JSONDecode(readfile(path));
+				local decoded = svc('HttpService'):JSONDecode(readfile(path));
 
 				Fatal.Notifier:Notify({
 					Title = "Config",
@@ -3843,7 +3863,7 @@ function Fatality:CreateConfigWindow(Root: ScreenGui , Fatal , Button: ImageButt
 					ConfigName = configName,
 				};
 
-				local code = game:GetService('HttpService'):JSONEncode(flags);
+				local code = svc('HttpService'):JSONEncode(flags);
 
 				res:SaveConfig(configName , code);
 				res:ReloadConfig();
@@ -3883,7 +3903,7 @@ function Fatality:CreateConfigWindow(Root: ScreenGui , Fatal , Button: ImageButt
 						Duration = 4,
 					});
 
-					local code = game:GetService('HttpService'):JSONEncode(flags);
+					local code = svc('HttpService'):JSONEncode(flags);
 
 					res:SaveConfig(configName , code);
 					res:ReloadConfig();
@@ -4327,7 +4347,7 @@ function Fatality.new(Window: Window)
 	User_name.Size = UDim2.new(0, 200, 0, 15)
 	User_name.ZIndex = 4
 	User_name.Font = Enum.Font.GothamMedium
-	User_name.Text = Client.DisplayName;
+	User_name.Text = (Client and Client.DisplayName) or "Player";
 	User_name.TextColor3 = Color3.fromRGB(255, 255, 255)
 	User_name.TextSize = 13.000
 	User_name.TextStrokeTransparency = 0.700
@@ -6314,7 +6334,7 @@ function Fatality:Loader(Config: Loader)
 	BlackFrame.Size = UDim2.new(1, 0, 1, 0)
 
 	Blur.Size = 0;
-	Blur.Parent = game:GetService('Lighting');
+	Blur.Parent = svc('Lighting');
 
 	Fatality:CreateAnimation(Blur,1,{
 		Size = 60
