@@ -310,7 +310,12 @@ local RunService = cloneref(game:GetService('RunService'));
 local Players = cloneref(game:GetService('Players'));
 local UserInputService = cloneref(game:GetService('UserInputService'));
 local Client = Players.LocalPlayer;
-local Mouse = Client:GetMouse();
+-- Mouse position via getmouselocation() only. No GetMouse() anywhere.
+local function MousePosition()
+	local ok, pos = pcall(getmouselocation);
+	if ok and typeof(pos) == "Vector2" then return pos; end;
+	return Vector2.zero;
+end;
 local CurrentCamera = workspace.CurrentCamera;
 local _,CoreGui = xpcall(function()
 	return (gethui and gethui()) or game:GetService("CoreGui"):FindFirstChild("RobloxGui");
@@ -358,8 +363,9 @@ end;
 
 function Fatality:IsMouseOverFrame(Frame : Frame) : boolean
 	local AbsPos: Vector2, AbsSize: Vector2 = Frame.AbsolutePosition, Frame.AbsoluteSize;
+	local MPos: Vector2 = MousePosition();
 
-	if Mouse.X >= AbsPos.X and Mouse.X <= AbsPos.X + AbsSize.X and Mouse.Y >= AbsPos.Y and Mouse.Y <= AbsPos.Y + AbsSize.Y then
+	if MPos.X >= AbsPos.X and MPos.X <= AbsPos.X + AbsSize.X and MPos.Y >= AbsPos.Y and MPos.Y <= AbsPos.Y + AbsSize.Y then
 		return true;
 	end;
 end;
@@ -1220,7 +1226,7 @@ function Fatality:CreateColorPicker(ColorBox: Frame,Transparency, Callback)
 				while (UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) or IsPressM1) do task.wait()
 					local ColorY = ColorRedGreenBlue.AbsolutePosition.Y
 					local ColorYM = ColorY + ColorRedGreenBlue.AbsoluteSize.Y;
-					local Value = math.clamp(Mouse.Y, ColorY, ColorYM)
+					local Value = math.clamp(MousePosition().Y, ColorY, ColorYM)
 					local Code = ((Value - ColorY) / (ColorYM - ColorY));
 
 					local Color = Color3.fromHSV(Code, CodeH, CodeV);
@@ -1253,7 +1259,7 @@ function Fatality:CreateColorPicker(ColorBox: Frame,Transparency, Callback)
 				IsPressM1 = true;
 
 				while (UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) or IsPressM1) do task.wait()
-					local transparency = math.clamp((((Mouse.X) - ColorOpc.AbsolutePosition.X) / ColorOpc.AbsoluteSize.X), 0, 1);
+					local transparency = math.clamp((((MousePosition().X) - ColorOpc.AbsolutePosition.X) / ColorOpc.AbsoluteSize.X), 0, 1);
 
 					Fatality:CreateAnimation(ColorOptSlide,0.35,{
 						Position = UDim2.new(transparency, 0, 0.5, 0)
@@ -1271,11 +1277,12 @@ function Fatality:CreateColorPicker(ColorBox: Frame,Transparency, Callback)
 				IsPressM1 = true;
 
 				while (UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) or IsPressM1) do task.wait();
+					local MPos = MousePosition();
 					local PosX = ColorPickBox.AbsolutePosition.X
 					local ScaleX = PosX + ColorPickBox.AbsoluteSize.X
-					local Value, PosY = math.clamp(Mouse.X, PosX, ScaleX), ColorPickBox.AbsolutePosition.Y
+					local Value, PosY = math.clamp(MPos.X, PosX, ScaleX), ColorPickBox.AbsolutePosition.Y
 					local ScaleY = PosY + ColorPickBox.AbsoluteSize.Y
-					local Vals = math.clamp(Mouse.Y, PosY, ScaleY)
+					local Vals = math.clamp(MPos.Y, PosY, ScaleY)
 
 					CodeH = (Value - PosX) / (ScaleX - PosX);
 					CodeV = (1 - ((Vals - PosY) / (ScaleY - PosY)));
