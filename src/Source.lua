@@ -310,13 +310,25 @@ local RunService = cloneref(game:GetService('RunService'));
 local Players = cloneref(game:GetService('Players'));
 local UserInputService = cloneref(game:GetService('UserInputService'));
 local Client = Players.LocalPlayer;
--- Mouse position via UserInputService only: same screen space the old
--- Mouse.X/Y reads used, but no GetMouse() object and no executor function.
+-- Mouse position in VIEWPORT space (what AbsolutePosition uses, since every
+-- lib ScreenGui sets IgnoreGuiInset). GetMouseLocation() includes the topbar
+-- inset (~36px) while AbsolutePosition excludes it — comparing them raw
+-- shifts every hit-test down, so bottom rows of popups read as "outside"
+-- and Option panels close on click. Subtract the inset to align the spaces.
+-- No GetMouse() object and no executor function anywhere on this path.
 local function MousePosition()
 	local ok, pos = pcall(function()
 		return UserInputService:GetMouseLocation();
 	end);
-	if ok and typeof(pos) == "Vector2" then return pos; end;
+	if ok and typeof(pos) == "Vector2" then
+		local okI, inset = pcall(function()
+			return game:GetService("GuiService"):GetGuiInset();
+		end);
+		if okI and typeof(inset) == "Vector2" then
+			return pos - inset;
+		end;
+		return pos;
+	end;
 	return Vector2.zero;
 end;
 local CurrentCamera = workspace.CurrentCamera;
