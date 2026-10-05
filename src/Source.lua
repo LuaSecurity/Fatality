@@ -4143,7 +4143,18 @@ function Fatality.new(Window: Window)
 
 	table.insert(Fatality.Windows,Fatalitywin)
 
-	protect_gui(Fatalitywin);
+	-- GUI protection crashes some executors: contain errors, and allow a full
+	-- skip via getgenv().FATALITY_NO_PROTECT = true (see UITest.lua).
+	do
+		local skipProtect = false;
+		pcall(function()
+			local g = (typeof(getgenv) == "function" and getgenv()) or _G;
+			skipProtect = g and rawget(g, "FATALITY_NO_PROTECT") == true;
+		end);
+		if not skipProtect then
+			pcall(protect_gui, Fatalitywin);
+		end;
+	end;
 
 	FatalFrame.Active = true;
 	FatalFrame.Name = Fatality:RandomString()
@@ -4268,7 +4279,16 @@ function Fatality.new(Window: Window)
 	UserIcon.Size = UDim2.new(0.800000012, 0, 0.800000012, 0)
 	UserIcon.SizeConstraint = Enum.SizeConstraint.RelativeYY
 	UserIcon.ZIndex = 5
-	UserIcon.Image = Players:GetUserThumbnailAsync(Client.UserId,Enum.ThumbnailType.HeadShot,Enum.ThumbnailSize.Size180x180);
+	UserIcon.Image = "";
+	-- Thumbnail fetch is a network yield: never block window construction.
+	task.spawn(function()
+		pcall(function()
+			local thumb = Players:GetUserThumbnailAsync(Client.UserId,Enum.ThumbnailType.HeadShot,Enum.ThumbnailSize.Size180x180);
+			if type(thumb) == "string" and thumb ~= "" then
+				UserIcon.Image = thumb;
+			end;
+		end);
+	end);
 
 	UICorner_3.CornerRadius = UDim.new(1, 0)
 	UICorner_3.Parent = UserIcon
@@ -4391,7 +4411,13 @@ function Fatality.new(Window: Window)
 	end;
 
 	function Fatal:SetProfile(icon: string)
-		UserIcon.Image = icon or Players:GetUserThumbnailAsync(Client.UserId,Enum.ThumbnailType.HeadShot,Enum.ThumbnailSize.Size180x180);
+		if type(icon) == "string" then UserIcon.Image = icon; return; end;
+		task.spawn(function()
+			pcall(function()
+				local thumb = Players:GetUserThumbnailAsync(Client.UserId,Enum.ThumbnailType.HeadShot,Enum.ThumbnailSize.Size180x180);
+				if type(thumb) == "string" and thumb ~= "" then UserIcon.Image = thumb; end;
+			end);
+		end);
 	end;
 
 	function Fatal:SetExpire(str: string)
