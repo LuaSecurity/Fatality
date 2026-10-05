@@ -353,13 +353,11 @@ local function MousePosition()
 	return Vector2.zero;
 end;
 local CurrentCamera = Workspace and Workspace.CurrentCamera;
-local _,CoreGui = xpcall(function()
-	return (gethui and gethui()) or (function()
-		local cg = svc("CoreGui");
-		return cg and cg:FindFirstChild("RobloxGui");
-	end)();
-end,function()
-	return Client.PlayerGui;
+-- UI parents STRICTLY to gethui(). No CoreGui / RobloxGui / PlayerGui
+-- fallbacks: anything else is visible to game-side scans.
+local CoreGui = nil;
+pcall(function()
+	if type(gethui) == "function" then CoreGui = gethui(); end;
 end);
 
 -- Fatality --
