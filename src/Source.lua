@@ -27,6 +27,10 @@ export type Menu = {
 	AutoFill: boolean
 }
 
+export type Tab = {
+	Name: string,
+}
+
 export type Section = {
 	Name: string,
 	Position: string,
@@ -4572,7 +4576,7 @@ function Fatality.new(Window: Window)
 		Menu = Menu or {};
 		Menu.Name = Menu.Name or "EXAMPLE";
 		Menu.Icon = Menu.Icon or "eye";
-		Menu.AutoFill = (Menu.AutoFill == nil and true) or false;
+		Menu.AutoFill = (Menu.AutoFill == nil and false) or Menu.AutoFill;
 
 		local MenuLib = {};
 		local MenuButton = Instance.new("Frame")
@@ -5576,7 +5580,7 @@ function Fatality.new(Window: Window)
 
 			BindEvent.Event:Connect(Toggle);
 
-			return Fatality:CreateElements(Elements,Elements.ZIndex,BindEvent,{
+			local _els = Fatality:CreateElements(Elements,Elements.ZIndex,BindEvent,{
 				Path = Menu.Name .. " > ".. Config.Name,
 				Memory = function(Name)
 					table.insert(Fatal.ElementContents,{
@@ -5586,6 +5590,113 @@ function Fatality.new(Window: Window)
 					});
 				end,
 			});
+			_els._Section = Section;
+			return _els;
+		end;
+
+		-- Sub-tabs (side tabs like Local / Enemy / Team / World). The first
+		-- AddTab call builds a left strip and indents the three columns;
+		-- each tab owns the sections created through it and shows only them
+		-- while selected. Sections added directly to the menu are never
+		-- hidden. Tabs stack their sections with the normal column layout.
+		local Tabs = {};
+		local SelectedTab = nil;
+		local TabsStrip = nil;
+
+		local function restyleTabs()
+			for _, t in ipairs(Tabs) do
+				local on = (t == SelectedTab);
+				if t.Button then
+					t.Button.BackgroundTransparency = on and 0.85 or 1;
+					t.Button.TextColor3 = on and Fatality.Colors.Main or Color3.fromRGB(255, 255, 255);
+				end;
+			end;
+		end;
+
+		local function selectTab(tab)
+			SelectedTab = tab;
+			for _, t in ipairs(Tabs) do
+				local on = (t == tab);
+				for _, f in ipairs(t.Frames) do
+					pcall(function()
+						if typeof(f) == "Instance" then f.Visible = on; end;
+					end);
+				end;
+			end;
+			restyleTabs();
+		end;
+
+		local function ensureTabsUI()
+			if TabsStrip then return; end;
+			Left.Position = UDim2.new(0.299, 0, 0.5, 0);
+			Left.Size = UDim2.new(0.27, 0, 1, -5);
+			Center.Position = UDim2.new(0.573, 0, 0.5, 0);
+			Center.Size = UDim2.new(0.27, 0, 1, -5);
+			Right.Position = UDim2.new(0.851, 0, 0.5, 0);
+			Right.Size = UDim2.new(0.27, 0, 1, -5);
+			TabsStrip = Instance.new("Frame");
+			local StripList = Instance.new("UIListLayout");
+			TabsStrip.Name = Fatality:RandomString();
+			TabsStrip.Parent = MenuLiber;
+			TabsStrip.BackgroundColor3 = Color3.fromRGB(255, 255, 255);
+			TabsStrip.BackgroundTransparency = 1.000;
+			TabsStrip.BorderColor3 = Color3.fromRGB(0, 0, 0);
+			TabsStrip.BorderSizePixel = 0;
+			TabsStrip.Position = UDim2.new(0, 6, 0, 5);
+			TabsStrip.Size = UDim2.new(0, 104, 1, -10);
+			TabsStrip.ZIndex = 7;
+			StripList.Parent = TabsStrip;
+			StripList.SortOrder = Enum.SortOrder.LayoutOrder;
+			StripList.Padding = UDim.new(0, 4);
+		end;
+
+		function MenuLib:AddTab(TabConfig)
+			TabConfig = TabConfig or {};
+			TabConfig.Name = TabConfig.Name or "TAB";
+			ensureTabsUI();
+			local tab = { Name = TabConfig.Name, Frames = {}, Button = nil };
+			local Btn = Instance.new("TextButton");
+			local BtnCorner = Instance.new("UICorner");
+			local BtnPad = Instance.new("UIPadding");
+			Btn.Name = Fatality:RandomString();
+			Btn.Parent = TabsStrip;
+			Btn.BackgroundColor3 = Color3.fromRGB(19, 19, 19);
+			Btn.BorderColor3 = Color3.fromRGB(0, 0, 0);
+			Btn.BorderSizePixel = 0;
+			Btn.Size = UDim2.new(1, 0, 0, 24);
+			Btn.FontFace = Fatality.FontSemiBold;
+			Btn.Text = TabConfig.Name;
+			Btn.TextColor3 = Color3.fromRGB(255, 255, 255);
+			Btn.TextSize = 13;
+			Btn.TextXAlignment = Enum.TextXAlignment.Left;
+			BtnPad.PaddingLeft = UDim.new(0, 8);
+			BtnPad.Parent = Btn;
+			BtnCorner.CornerRadius = UDim.new(0, 3);
+			BtnCorner.Parent = Btn;
+			Fatality:ProtectText(Btn,TabConfig.Name);
+			Btn.MouseButton1Click:Connect(function()
+				selectTab(tab);
+			end);
+			tab.Button = Btn;
+			table.insert(Tabs, tab);
+			local TabLib = {};
+			function TabLib:AddSection(Config)
+				local els = MenuLib:AddSection(Config);
+				if type(els) == "table" and typeof(els._Section) == "Instance" then
+					table.insert(tab.Frames, els._Section);
+					els._Section.Visible = (SelectedTab == tab);
+				end;
+				return els;
+			end;
+			function TabLib:Select()
+				selectTab(tab);
+			end;
+			if SelectedTab == nil then
+				selectTab(tab);
+			else
+				restyleTabs();
+			end;
+			return TabLib;
 		end;
 
 		return MenuLib;
