@@ -646,7 +646,7 @@ function Fatality:CreateOption(OptionButton: ImageButton): Elements
 			Bindable:SetAttribute('V',true);
 			Bindable:Fire(true);
 
-			local size = math.clamp(UIListLayout.AbsoluteContentSize.Y + 15,0,200)
+			local size = math.clamp(UIListLayout.AbsoluteContentSize.Y + 15,0,320)
 
 			ExtElementFrame.Position = UDim2.fromOffset(OptionButton.AbsolutePosition.X + 100, OptionButton.AbsolutePosition.Y + (size / 2))
 
@@ -669,11 +669,12 @@ function Fatality:CreateOption(OptionButton: ImageButton): Elements
 
 			SPAWN_THREAD = task.spawn(function()
 				while true do task.wait(0.1)
-					local size = math.clamp(UIListLayout.AbsoluteContentSize.Y + 15,0,200)
+					local size = math.clamp(UIListLayout.AbsoluteContentSize.Y + 15,0,320)
 					local ud = UDim2.fromOffset(OptionButton.AbsolutePosition.X + 100, OptionButton.AbsolutePosition.Y + (size / 2));
 
 					Fatality:CreateAnimation(ExtElementFrame,0.35,{
-						Position = ud
+						Position = ud,
+						Size = UDim2.new(0, 200, 0, size)
 					});
 				end;
 			end)
@@ -4001,8 +4002,28 @@ function Fatality.new(Window: Window)
 		end;
 	end);
 
+	game:GetService("RunService").RenderStepped:Connect(function()
+		if Fatal.Toggle and Fatalitywin.Parent then
+			pcall(function()
+				local UIS = game:GetService("UserInputService");
+				if UIS.MouseBehavior ~= Enum.MouseBehavior.Default then
+					UIS.MouseBehavior = Enum.MouseBehavior.Default;
+				end;
+			end);
+		end;
+	end);
+
 	local ToggleUI = function(bool)
 		Fatal.Signal:Fire(bool);
+		pcall(function()
+			local UIS = game:GetService("UserInputService");
+			if bool then
+				Fatal._SavedMouse = UIS.MouseBehavior;
+				UIS.MouseBehavior = Enum.MouseBehavior.Default;
+			elseif Fatal._SavedMouse ~= nil then
+				UIS.MouseBehavior = Fatal._SavedMouse;
+			end;
+		end);
 
 		if bool then
 			for i,v in next , Fatal.Menus do
@@ -7050,12 +7071,98 @@ do
 					end;
 				end,
 			});
-			handles.Key2 = wireKey(cfg.BindName2 or "Bind 2");
 			handles.AddBtn = toggle.Option:AddButton({
 				Name = cfg.AddName or "Add bind",
 				Callback = function()
 					handles.Count = handles.Count + 1;
-					wireKey("Bind " .. tostring(handles.Count + 1));
+					wireKey("Bind " .. tostring(handles.Count));
+					if cfg.OnBindAdded then
+						pcall(cfg.OnBindAdded, handles.Count);
+					end;
+				end,
+			});
+		end;
+		return handles;
+	end;
+
+	function Fatality.AddBindableSlider(section, cfg)
+		cfg = cfg or {};
+		local name = cfg.Name or "Slider";
+		local def = (cfg.Default == nil) and 50 or cfg.Default;
+		local mn = cfg.Min or 0;
+		local mx = cfg.Max or 100;
+		local flag = cfg.Flag;
+		local slider = section:AddSlider({
+			Name = name,
+			Default = def,
+			Min = mn,
+			Max = mx,
+			Type = cfg.Type or "",
+			Round = cfg.Round or 0,
+			Risky = cfg.Risky or false,
+			Option = true,
+			Flag = flag,
+			Callback = cfg.Callback or function()
+			end,
+		});
+		local rec = { Keys = {}, Target = cfg.Value };
+		if rec.Target == nil then
+			rec.Target = def;
+		end;
+		function rec.Press()
+			slider:SetValue(math.clamp(rec.Target, mn, mx));
+		end;
+		function rec.Release()
+		end;
+		function rec.AddKey(key)
+			if key == nil then
+				return;
+			end;
+			for _, k in ipairs(rec.Keys) do
+				if Fatality.NormKey(k) == Fatality.NormKey(key) then
+					return;
+				end;
+			end;
+			table.insert(rec.Keys, key);
+		end;
+		function rec.SetTarget(v)
+			rec.Target = v;
+		end;
+		table.insert(Fatality._BindRegistry, rec);
+		_ensureDispatcher();
+		local handles = { Slider = slider, Bind = rec, Count = 0 };
+		if slider and slider.Option and type(slider.Option.AddKeybind) == "function" then
+			local function wireKey(label)
+				handles.Count = handles.Count + 1;
+				return slider.Option:AddKeybind({
+					Name = label,
+					Callback = function(k)
+						rec.AddKey(k);
+						if cfg.OnBind then
+							pcall(cfg.OnBind, k);
+						end;
+					end,
+				});
+			end;
+			handles.Key1 = wireKey(cfg.BindName or "Bind 1");
+			handles.ValueCtrl = slider.Option:AddSlider({
+				Name = cfg.ValueName or "Set value",
+				Min = mn,
+				Max = mx,
+				Default = rec.Target,
+				Flag = (flag and (flag .. "_value")) or nil,
+				Callback = function(v)
+					rec.SetTarget(v);
+					if cfg.OnValue then
+						pcall(cfg.OnValue, v);
+					end;
+				end,
+			});
+			handles.AddBtn = slider.Option:AddButton({
+				Name = cfg.AddName or "Add bind",
+				Callback = function()
+					handles.Count = handles.Count + 1;
+					wireKey("Bind " .. tostring(handles.Count));
 					if cfg.OnBindAdded then
 						pcall(cfg.OnBindAdded, handles.Count);
 					end;
