@@ -2907,7 +2907,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		ValueFrame.BorderSizePixel = 0
 		ValueFrame.ClipsDescendants = true
 		ValueFrame.Position = UDim2.new(1, -3, 0.5, 0)
-		ValueFrame.Size = UDim2.new(0, 65, 0.850000024, 0)
+		ValueFrame.Size = UDim2.new(0, 75, 0.850000024, 0)
 		ValueFrame.ZIndex = ZIndex + 2
 
 		UICorner.CornerRadius = UDim.new(0, 2)
@@ -3112,7 +3112,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		ValueFrame.BorderSizePixel = 0
 		ValueFrame.ClipsDescendants = true
 		ValueFrame.Position = UDim2.new(1, -3, 0.5, 0)
-		ValueFrame.Size = UDim2.new(0, 90, 0.850000024, 0)
+		ValueFrame.Size = UDim2.new(0, 75, 0.850000024, 0)
 		ValueFrame.ZIndex = ZIndex + 2
 
 		UICorner.CornerRadius = UDim.new(0, 2)
@@ -5620,6 +5620,7 @@ function Fatality.new(Window: Window)
 		local Tabs = {};
 		local SelectedTab = nil;
 		local TabsStrip = nil;
+		local TabIndicator = nil;
 
 		local function restyleTabs()
 			for _, t in ipairs(Tabs) do
@@ -5630,36 +5631,39 @@ function Fatality.new(Window: Window)
 						TextColor3 = on and Fatality.Colors.Main or Color3.fromRGB(255, 255, 255),
 					});
 				end;
-				if t.Bar then
-					Fatality:CreateAnimation(t.Bar, 0.25, {
-						BackgroundTransparency = on and 0 or 1,
-						Size = on and UDim2.new(0, 3, 1, -10) or UDim2.new(0, 3, 1, -18),
-					});
-				end;
 			end;
 		end;
 
 		local function selectTab(tab)
 			SelectedTab = tab;
-			for _, t in ipairs(Tabs) do
+			local idx = 0;
+			for i, t in ipairs(Tabs) do
 				local on = (t == tab);
+				if on then
+					idx = i;
+				end;
 				for _, f in ipairs(t.Frames) do
 					pcall(function()
 						if typeof(f) == "Instance" then f.Visible = on; end;
 					end);
 				end;
 			end;
+			if TabIndicator and idx > 0 then
+				Fatality:CreateAnimation(TabIndicator, 0.35, {
+					Position = UDim2.new(0, 2, 0, (idx - 1) * 28 + 6),
+				});
+			end;
 			restyleTabs();
 		end;
 
 		local function ensureTabsUI()
 			if TabsStrip then return; end;
-			Left.Position = UDim2.new(0.299, 0, 0.5, 0);
-			Left.Size = UDim2.new(0.27, 0, 1, -5);
-			Center.Position = UDim2.new(0.573, 0, 0.5, 0);
-			Center.Size = UDim2.new(0.27, 0, 1, -5);
-			Right.Position = UDim2.new(0.851, 0, 0.5, 0);
-			Right.Size = UDim2.new(0.27, 0, 1, -5);
+			Left.Position = UDim2.new(0.32, 0, 0.5, 0);
+			Left.Size = UDim2.new(0.26, 0, 1, -5);
+			Center.Position = UDim2.new(0.59, 0, 0.5, 0);
+			Center.Size = UDim2.new(0.26, 0, 1, -5);
+			Right.Position = UDim2.new(0.86, 0, 0.5, 0);
+			Right.Size = UDim2.new(0.26, 0, 1, -5);
 			TabsStrip = Instance.new("Frame");
 			local StripList = Instance.new("UIListLayout");
 			TabsStrip.Name = Fatality:RandomString();
@@ -5695,7 +5699,7 @@ function Fatality.new(Window: Window)
 			Btn.TextColor3 = Color3.fromRGB(255, 255, 255);
 			Btn.TextSize = 13;
 			Btn.TextXAlignment = Enum.TextXAlignment.Left;
-			BtnPad.PaddingLeft = UDim.new(0, 8);
+			BtnPad.PaddingLeft = UDim.new(0, 14);
 			BtnPad.Parent = Btn;
 			BtnCorner.CornerRadius = UDim.new(0, 3);
 			BtnCorner.Parent = Btn;
@@ -5703,19 +5707,6 @@ function Fatality.new(Window: Window)
 			Btn.MouseButton1Click:Connect(function()
 				selectTab(tab);
 			end);
-			local Bar = Instance.new("Frame");
-			Bar.Name = Fatality:RandomString();
-			Bar.Parent = Btn;
-			Bar.AnchorPoint = Vector2.new(0, 0.5);
-			Bar.BackgroundColor3 = Fatality.Colors.Main;
-			Bar.BorderSizePixel = 0;
-			Bar.Position = UDim2.new(0, 1, 0.5, 0);
-			Bar.Size = UDim2.new(0, 3, 1, -18);
-			Bar.BackgroundTransparency = 1;
-			local BarCorner = Instance.new("UICorner");
-			BarCorner.CornerRadius = UDim.new(0, 2);
-			BarCorner.Parent = Bar;
-			tab.Bar = Bar;
 			Fatality:CreateHover(Btn, function(hover)
 				if SelectedTab == tab then
 					return;
@@ -5726,6 +5717,19 @@ function Fatality.new(Window: Window)
 			end);
 			tab.Button = Btn;
 			table.insert(Tabs, tab);
+			if not TabIndicator then
+				TabIndicator = Instance.new("Frame");
+				TabIndicator.Name = Fatality:RandomString();
+				TabIndicator.Parent = TabsStrip;
+				TabIndicator.BackgroundColor3 = Fatality.Colors.Main;
+				TabIndicator.BorderSizePixel = 0;
+				TabIndicator.Position = UDim2.new(0, 2, 0, 6);
+				TabIndicator.Size = UDim2.new(0, 3, 0, 12);
+				TabIndicator.BackgroundTransparency = 0;
+				local IndCorner = Instance.new("UICorner");
+				IndCorner.CornerRadius = UDim.new(0, 2);
+				IndCorner.Parent = TabIndicator;
+			end;
 			local TabLib = {};
 			function TabLib:AddSection(Config)
 				local els = MenuLib:AddSection(Config);
@@ -7125,7 +7129,7 @@ do
 			for _, f in ipairs(files) do
 				local s = string.gsub(tostring(f), "\\", "/");
 				local base = s:match("([^/]+)$") or s;
-				if string.sub(base, -5) == ".json" then
+				if string.sub(base, 1, 1) ~= "_" and string.sub(base, -5) == ".json" then
 					table.insert(out, string.sub(base, 1, -6));
 				end;
 			end;
