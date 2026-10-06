@@ -1470,7 +1470,7 @@ function Fatality:CreateDropdown(Parent: Frame, Default: string | {[string]: boo
 	DropdownItemFrame.ClipsDescendants = true
 	DropdownItemFrame.Position = UDim2.new(4,0,4,0)
 	DropdownItemFrame.Size = UDim2.new(0, 175, 0, 100)
-	DropdownItemFrame.ZIndex = 100
+	DropdownItemFrame.ZIndex = 500
 
 	UICorner.CornerRadius = UDim.new(0, 2)
 	UICorner.Parent = DropdownItemFrame
@@ -1503,7 +1503,7 @@ function Fatality:CreateDropdown(Parent: Frame, Default: string | {[string]: boo
 	ScrollingFrame.ClipsDescendants = false
 	ScrollingFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 	ScrollingFrame.Size = UDim2.new(1, -5, 1, -5)
-	ScrollingFrame.ZIndex = 109
+	ScrollingFrame.ZIndex = 509
 	ScrollingFrame.ScrollBarThickness = 0
 
 	UIListLayout.Parent = ScrollingFrame
@@ -1523,7 +1523,7 @@ function Fatality:CreateDropdown(Parent: Frame, Default: string | {[string]: boo
 		db_selected.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		db_selected.BorderSizePixel = 0
 		db_selected.Size = UDim2.new(1, 0, 0, 10)
-		db_selected.ZIndex = 110
+		db_selected.ZIndex = 510
 		db_selected.FontFace = Fatality.FontSemiBold
 		db_selected.TextColor3 = Fatality.Colors.Main
 		db_selected.TextSize = 12.000
@@ -4013,6 +4013,60 @@ function Fatality.new(Window: Window)
 		end;
 	end);
 
+	if not Fatality:IsMobile() then
+		local CursorRing = Instance.new("Frame");
+		local CursorDot = Instance.new("Frame");
+		local CursorStroke = Instance.new("UIStroke");
+		local CursorCorner = Instance.new("UICorner");
+		local DotCorner = Instance.new("UICorner");
+		CursorRing.Name = Fatality:RandomString();
+		CursorRing.Parent = Fatalitywin;
+		CursorRing.AnchorPoint = Vector2.new(0.5, 0.5);
+		CursorRing.BackgroundTransparency = 1.000;
+		CursorRing.BorderSizePixel = 0;
+		CursorRing.Position = UDim2.fromOffset(0, 0);
+		CursorRing.Size = UDim2.fromOffset(22, 22);
+		CursorRing.ZIndex = 5000;
+		CursorRing.Active = false;
+		CursorRing.Visible = false;
+		CursorCorner.CornerRadius = UDim.new(1, 0);
+		CursorCorner.Parent = CursorRing;
+		CursorStroke.Color = Fatality.Colors.Main;
+		CursorStroke.Thickness = 2;
+		CursorStroke.Parent = CursorRing;
+		CursorDot.Name = Fatality:RandomString();
+		CursorDot.Parent = CursorRing;
+		CursorDot.AnchorPoint = Vector2.new(0.5, 0.5);
+		CursorDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255);
+		CursorDot.BorderSizePixel = 0;
+		CursorDot.Position = UDim2.new(0.5, 0, 0.5, 0);
+		CursorDot.Size = UDim2.fromOffset(5, 5);
+		CursorDot.ZIndex = 5001;
+		CursorDot.Active = false;
+		DotCorner.CornerRadius = UDim.new(1, 0);
+		DotCorner.Parent = CursorDot;
+		local _cursorPos = nil;
+		game:GetService("RunService").RenderStepped:Connect(function()
+			if Fatal.Toggle and Fatalitywin.Parent then
+				local ok, mp = pcall(function()
+					return game:GetService("UserInputService"):GetMouseLocation();
+				end);
+				if ok and typeof(mp) == "Vector2" then
+					if not _cursorPos then
+						_cursorPos = mp;
+					else
+						_cursorPos = _cursorPos:Lerp(mp, 0.45);
+					end;
+					CursorRing.Position = UDim2.fromOffset(math.floor(_cursorPos.X), math.floor(_cursorPos.Y));
+					CursorStroke.Color = Fatality.Colors.Main;
+					CursorRing.Visible = true;
+				end;
+			elseif CursorRing.Visible then
+				CursorRing.Visible = false;
+			end;
+		end);
+	end;
+
 	local ToggleUI = function(bool)
 		Fatal.Signal:Fire(bool);
 		pcall(function()
@@ -5514,6 +5568,13 @@ function Fatality.new(Window: Window)
 		end;
 
 		local function clampSections()
+			for _, lay in ipairs({ UIListLayout, UIListLayout_2, UIListLayout_3 }) do
+				pcall(function()
+					if lay.Padding.Offset ~= 2 then
+						lay.Padding = UDim.new(0, 2);
+					end;
+				end);
+			end;
 			for _, col in ipairs({ Left, Center, Right }) do
 				pcall(function()
 					for _, f in ipairs(col:GetChildren()) do
@@ -7029,55 +7090,64 @@ do
 			Callback = cfg.Callback or function()
 			end,
 		});
-		local rec = Fatality.BindToggle(toggle, {
-			Mode = cfg.Mode or "Toggle",
-			SetTo = (cfg.SetTo == nil) and true or cfg.SetTo,
-		});
-		local handles = { Toggle = toggle, Bind = rec, Count = 0 };
+		local handles = { Toggle = toggle, Rows = {}, Count = 0 };
+		handles.Bind = nil;
 		if toggle and toggle.Option and type(toggle.Option.AddKeybind) == "function" then
-			local function wireKey(label)
-				handles.Count = handles.Count + 1;
-				return toggle.Option:AddKeybind({
+			local function addBindRow(label, defMode, defSetTo, persist)
+				local idx = #handles.Rows + 1;
+				local rowRec = Fatality.BindToggle(toggle, { Mode = defMode, SetTo = defSetTo });
+				local row = { rec = rowRec };
+				row.key = toggle.Option:AddKeybind({
 					Name = label,
 					Callback = function(k)
-						rec.AddKey(k);
+						rowRec.AddKey(k);
 						if cfg.OnBind then
-							pcall(cfg.OnBind, k);
+							pcall(cfg.OnBind, k, idx);
 						end;
 					end,
 				});
+				row.mode = toggle.Option:AddDropdown({
+					Name = "Mode",
+					Values = cfg.Modes or { "Toggle", "Hold", "Always", "Set" },
+					Default = defMode,
+					Flag = (persist and flag and (flag .. "_mode")) or nil,
+					Callback = function(m)
+						rowRec.SetMode(m);
+						if cfg.OnMode then
+							pcall(cfg.OnMode, m, idx);
+						end;
+					end,
+				});
+				row.set = toggle.Option:AddToggle({
+					Name = "Set to",
+					Default = defSetTo,
+					Flag = (persist and flag and (flag .. "_setto")) or nil,
+					Callback = function(v)
+						rowRec.SetSetTo(v);
+						if cfg.OnSetTo then
+							pcall(cfg.OnSetTo, v, idx);
+						end;
+					end,
+				});
+				table.insert(handles.Rows, row);
+				handles.Count = #handles.Rows;
+				return row;
 			end;
-			handles.Key1 = wireKey(cfg.BindName or "Bind 1");
-			handles.ModeCtrl = toggle.Option:AddDropdown({
-				Name = cfg.ModeName or "Mode",
-				Values = cfg.Modes or { "Toggle", "Hold", "Always", "Set" },
-				Default = rec.Mode,
-				Flag = (flag and (flag .. "_mode")) or nil,
-				Callback = function(m)
-					rec.SetMode(m);
-					if cfg.OnMode then
-						pcall(cfg.OnMode, m);
-					end;
-				end,
-			});
-			handles.SetCtrl = toggle.Option:AddToggle({
-				Name = cfg.SetName or "Set to",
-				Default = rec.SetTo,
-				Flag = (flag and (flag .. "_setto")) or nil,
-				Callback = function(v)
-					rec.SetSetTo(v);
-					if cfg.OnSetTo then
-						pcall(cfg.OnSetTo, v);
-					end;
-				end,
-			});
+			local first = addBindRow(cfg.BindName or "Bind 1", cfg.Mode or "Toggle", ((cfg.SetTo == nil) and true or cfg.SetTo), true);
+			handles.Bind = first.rec;
+			handles.Key1 = first.key;
+			handles.ModeCtrl = first.mode;
+			handles.SetCtrl = first.set;
 			handles.AddBtn = toggle.Option:AddButton({
 				Name = cfg.AddName or "Add bind",
 				Callback = function()
-					handles.Count = handles.Count + 1;
-					wireKey("Bind " .. tostring(handles.Count));
+					local m, s = "Toggle", true;
+					if handles.Rows[1] and handles.Rows[1].rec then
+						m, s = handles.Rows[1].rec.Mode, handles.Rows[1].rec.SetTo;
+					end;
+					addBindRow("Bind " .. tostring(#handles.Rows + 1), m, s, false);
 					if cfg.OnBindAdded then
-						pcall(cfg.OnBindAdded, handles.Count);
+						pcall(cfg.OnBindAdded, #handles.Rows);
 					end;
 				end,
 			});
@@ -7105,66 +7175,82 @@ do
 			Callback = cfg.Callback or function()
 			end,
 		});
-		local rec = { Keys = {}, Target = cfg.Value };
-		if rec.Target == nil then
-			rec.Target = def;
-		end;
-		function rec.Press()
-			slider:SetValue(math.clamp(rec.Target, mn, mx));
-		end;
-		function rec.Release()
-		end;
-		function rec.AddKey(key)
-			if key == nil then
-				return;
+		local function makeRec(target)
+			local rec = { Keys = {}, Target = target };
+			function rec.Press()
+				slider:SetValue(math.clamp(rec.Target, mn, mx));
 			end;
-			for _, k in ipairs(rec.Keys) do
-				if Fatality.NormKey(k) == Fatality.NormKey(key) then
+			function rec.Release()
+			end;
+			function rec.AddKey(key)
+				if key == nil then
 					return;
 				end;
+				for _, k in ipairs(rec.Keys) do
+					if Fatality.NormKey(k) == Fatality.NormKey(key) then
+						return;
+					end;
+				end;
+				table.insert(rec.Keys, key);
 			end;
-			table.insert(rec.Keys, key);
+			function rec.SetTarget(v)
+				rec.Target = v;
+			end;
+			table.insert(Fatality._BindRegistry, rec);
+			_ensureDispatcher();
+			return rec;
 		end;
-		function rec.SetTarget(v)
-			rec.Target = v;
-		end;
-		table.insert(Fatality._BindRegistry, rec);
-		_ensureDispatcher();
-		local handles = { Slider = slider, Bind = rec, Count = 0 };
+		local handles = { Slider = slider, Rows = {}, Count = 0 };
+		handles.Bind = nil;
 		if slider and slider.Option and type(slider.Option.AddKeybind) == "function" then
-			local function wireKey(label)
-				handles.Count = handles.Count + 1;
-				return slider.Option:AddKeybind({
+			local function addValueRow(label, defTarget, persist)
+				local idx = #handles.Rows + 1;
+				local rowRec = makeRec(defTarget);
+				local row = { rec = rowRec };
+				row.key = slider.Option:AddKeybind({
 					Name = label,
 					Callback = function(k)
-						rec.AddKey(k);
+						rowRec.AddKey(k);
 						if cfg.OnBind then
-							pcall(cfg.OnBind, k);
+							pcall(cfg.OnBind, k, idx);
 						end;
 					end,
 				});
+				row.val = slider.Option:AddSlider({
+					Name = cfg.ValueName or "Set value",
+					Min = mn,
+					Max = mx,
+					Default = defTarget,
+					Flag = (persist and flag and (flag .. "_value")) or nil,
+					Callback = function(v)
+						rowRec.SetTarget(v);
+						if cfg.OnValue then
+							pcall(cfg.OnValue, v, idx);
+						end;
+					end,
+				});
+				table.insert(handles.Rows, row);
+				handles.Count = #handles.Rows;
+				return row;
 			end;
-			handles.Key1 = wireKey(cfg.BindName or "Bind 1");
-			handles.ValueCtrl = slider.Option:AddSlider({
-				Name = cfg.ValueName or "Set value",
-				Min = mn,
-				Max = mx,
-				Default = rec.Target,
-				Flag = (flag and (flag .. "_value")) or nil,
-				Callback = function(v)
-					rec.SetTarget(v);
-					if cfg.OnValue then
-						pcall(cfg.OnValue, v);
-					end;
-				end,
-			});
+			local firstTarget = cfg.Value;
+			if firstTarget == nil then
+				firstTarget = def;
+			end;
+			local first = addValueRow(cfg.BindName or "Bind 1", firstTarget, true);
+			handles.Bind = first.rec;
+			handles.Key1 = first.key;
+			handles.ValueCtrl = first.val;
 			handles.AddBtn = slider.Option:AddButton({
 				Name = cfg.AddName or "Add bind",
 				Callback = function()
-					handles.Count = handles.Count + 1;
-					wireKey("Bind " .. tostring(handles.Count));
+					local t = def;
+					if handles.Rows[1] and handles.Rows[1].rec then
+						t = handles.Rows[1].rec.Target;
+					end;
+					addValueRow("Bind " .. tostring(#handles.Rows + 1), t, false);
 					if cfg.OnBindAdded then
-						pcall(cfg.OnBindAdded, handles.Count);
+						pcall(cfg.OnBindAdded, #handles.Rows);
 					end;
 				end,
 			});
