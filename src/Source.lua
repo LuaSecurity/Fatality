@@ -6704,6 +6704,576 @@ function Fatality:CreateNotifier(): Notifier
 	return res;
 end;
 
+-- ======================================================================
+-- Fatality UX Pack v1.1 — aliases, bind manager, config helpers.
+-- Adds convenience on top of the existing API without changing it:
+--   * every control also answers :Set() / :Get()
+--   * dropdowns answer :SetValues(), listboxes answer :Set()
+--   * Fatality.BindToggle / AddBindableToggle: keybinds that actually
+--     flip the toggle visual (press -> :SetValue, so callbacks fire),
+--     with Toggle/Hold/Always/Set modes and unlimited extra binds
+--   * folder config helpers: List/Save/Load/Delete + dropdown+listbox
+--     binding + autosave polling + autoload
+--   * tab helpers: EnsureTab / EnsureSection (nil-safe fallbacks)
+-- ======================================================================
+do
+	local _UIS = game:GetService("UserInputService");
+	local _Http = game:GetService("HttpService");
+
+	local _origCreateResponse = Fatality.CreateResponse;
+	function Fatality:CreateResponse(args)
+		if type(args) == "table" then
+			if args.SetValue and not args.Set then
+				args.Set = args.SetValue;
+			end;
+			if args.GetValue and not args.Get then
+				args.Get = args.GetValue;
+			end;
+			if args.SetData and not args.SetValues then
+				args.SetValues = args.SetData;
+			end;
+			if args.SetText and not args.Set then
+				args.Set = args.SetText;
+			end;
+			if args.SetText and not args.SetTextAlias then
+				args.SetTextAlias = true;
+			end;
+			if args.Fire and not args.Click then
+				args.Click = args.Fire;
+			end;
+			if args.Refresh and not args.RefreshList then
+				args.RefreshList = args.Refresh;
+			end;
+		end;
+		return _origCreateResponse(self, args);
+	end;
+
+	Fatality.UXVersion = "1.1";
+	Fatality._BindRegistry = Fatality._BindRegistry or {};
+
+	local function _normKey(k)
+		if typeof(k) == "EnumItem" then
+			return string.lower(k.Name);
+		end;
+		return string.lower(tostring(k or ""));
+	end;
+
+	local function _inputKeyName(input)
+		local ok, n = pcall(function()
+			return input.KeyCode.Name;
+		end);
+		if ok and type(n) == "string" then
+			return n;
+		end;
+		return tostring(input.KeyCode);
+	end;
+
+	local _dispatcherOn = false;
+	local function _ensureDispatcher()
+		if _dispatcherOn then
+			return;
+		end;
+		_dispatcherOn = true;
+		_UIS.InputBegan:Connect(function(input, gpe)
+			if gpe then
+				return;
+			end;
+			local kn = string.lower(_inputKeyName(input));
+			for _, rec in ipairs(Fatality._BindRegistry) do
+				for _, k in ipairs(rec.Keys) do
+					if kn == _normKey(k) then
+						pcall(function()
+							rec.Press();
+						end);
+						break
+					end;
+				end;
+			end;
+		end);
+		_UIS.InputEnded:Connect(function(input)
+			local kn = string.lower(_inputKeyName(input));
+			for _, rec in ipairs(Fatality._BindRegistry) do
+				for _, k in ipairs(rec.Keys) do
+					if kn == _normKey(k) then
+						pcall(function()
+							rec.Release();
+						end);
+						break
+					end;
+				end;
+			end;
+		end);
+	end;
+
+	function Fatality.NormKey(k)
+		return _normKey(k);
+	end;
+
+	function Fatality.BindToggle(toggle, opts)
+		opts = opts or {};
+		local rec = {
+			Toggle = toggle,
+			Keys = {},
+			Mode = opts.Mode or "Toggle",
+			SetTo = (opts.SetTo == nil) and true or opts.SetTo,
+			Held = false,
+			Pressed = false,
+		};
+		local function cur()
+			local ok, v = pcall(function()
+				return toggle:GetValue();
+			end);
+			if ok and type(v) == "boolean" then
+				return v;
+			end;
+			return false;
+		end;
+		function rec.Press()
+			if rec.Mode == "Always" then
+				toggle:SetValue(true);
+			elseif rec.Mode == "Hold" then
+				rec.Held = true;
+				toggle:SetValue(true);
+			elseif rec.Mode == "Set" then
+				rec.Pressed = true;
+				toggle:SetValue(rec.SetTo ~= false);
+			else
+				toggle:SetValue(not cur());
+			end;
+		end;
+		function rec.Release()
+			rec.Held = false;
+			rec.Pressed = false;
+			if rec.Mode == "Hold" then
+				toggle:SetValue(false);
+			end;
+		end;
+		function rec.AddKey(key)
+			if key == nil then
+				return;
+			end;
+			for _, k in ipairs(rec.Keys) do
+				if _normKey(k) == _normKey(key) then
+					return;
+				end;
+			end;
+			table.insert(rec.Keys, key);
+		end;
+		function rec.SetMode(m)
+			rec.Mode = m;
+		end;
+		function rec.SetSetTo(v)
+			rec.SetTo = v;
+		end;
+		if opts.DefaultKey ~= nil then
+			rec.AddKey(opts.DefaultKey);
+		end;
+		if type(opts.Keys) == "table" then
+			for _, k in ipairs(opts.Keys) do
+				rec.AddKey(k);
+			end;
+		end;
+		table.insert(Fatality._BindRegistry, rec);
+		_ensureDispatcher();
+		return rec;
+	end;
+
+	function Fatality.AddBindableToggle(section, cfg)
+		cfg = cfg or {};
+		local name = cfg.Name or "Toggle";
+		local def = (cfg.Default == nil) and false or cfg.Default;
+		local flag = cfg.Flag;
+		local toggle = section:AddToggle({
+			Name = name,
+			Default = def,
+			Risky = cfg.Risky or false,
+			Option = true,
+			Flag = flag,
+			Callback = cfg.Callback or function()
+			end,
+		});
+		local rec = Fatality.BindToggle(toggle, {
+			Mode = cfg.Mode or "Toggle",
+			SetTo = (cfg.SetTo == nil) and true or cfg.SetTo,
+		});
+		local handles = { Toggle = toggle, Bind = rec, Count = 0 };
+		if toggle and toggle.Option and type(toggle.Option.AddKeybind) == "function" then
+			local function wireKey(label)
+				handles.Count = handles.Count + 1;
+				return toggle.Option:AddKeybind({
+					Name = label,
+					Callback = function(k)
+						rec.AddKey(k);
+						if cfg.OnBind then
+							pcall(cfg.OnBind, k);
+						end;
+					end,
+				});
+			end;
+			handles.Key1 = wireKey(cfg.BindName or "Bind 1");
+			handles.ModeCtrl = toggle.Option:AddDropdown({
+				Name = cfg.ModeName or "Mode",
+				Values = cfg.Modes or { "Toggle", "Hold", "Always", "Set" },
+				Default = rec.Mode,
+				Flag = (flag and (flag .. "_mode")) or nil,
+				Callback = function(m)
+					rec.SetMode(m);
+					if cfg.OnMode then
+						pcall(cfg.OnMode, m);
+					end;
+				end,
+			});
+			handles.SetCtrl = toggle.Option:AddToggle({
+				Name = cfg.SetName or "Set to",
+				Default = rec.SetTo,
+				Flag = (flag and (flag .. "_setto")) or nil,
+				Callback = function(v)
+					rec.SetSetTo(v);
+					if cfg.OnSetTo then
+						pcall(cfg.OnSetTo, v);
+					end;
+				end,
+			});
+			handles.Key2 = wireKey(cfg.BindName2 or "Bind 2");
+			handles.AddBtn = toggle.Option:AddButton({
+				Name = cfg.AddName or "Add bind",
+				Callback = function()
+					handles.Count = handles.Count + 1;
+					wireKey("Bind " .. tostring(handles.Count + 1));
+					if cfg.OnBindAdded then
+						pcall(cfg.OnBindAdded, handles.Count);
+					end;
+				end,
+			});
+		end;
+		return handles;
+	end;
+
+	function Fatality.WireMenuKey(window, key)
+		local box = { Key = key or "RightShift" };
+		_UIS.InputBegan:Connect(function(input, gpe)
+			if gpe then
+				return;
+			end;
+			local kn = string.lower(_inputKeyName(input));
+			if kn == _normKey(box.Key) or input.KeyCode == Enum.KeyCode.Insert then
+				pcall(function()
+					window:SetVisible(not window.Toggle);
+				end);
+			end;
+		end);
+		return box;
+	end;
+
+	function Fatality.EnsureTab(menu, name)
+		if type(menu.AddTab) ~= "function" then
+			return nil;
+		end;
+		menu._FatalTabs = menu._FatalTabs or {};
+		if menu._FatalTabs[name] then
+			return menu._FatalTabs[name];
+		end;
+		local tab = menu:AddTab({ Name = name });
+		menu._FatalTabs[name] = tab;
+		return tab;
+	end;
+
+	function Fatality.EnsureSection(tabOrMenu, menuFallback, pos, name)
+		local ok, sec = pcall(function()
+			if tabOrMenu then
+				return tabOrMenu:AddSection({ Position = pos, Name = name });
+			end;
+			return menuFallback:AddSection({ Position = pos, Name = name });
+		end);
+		if ok and sec then
+			return sec;
+		end;
+		return menuFallback:AddSection({ Position = pos, Name = name });
+	end;
+
+	local function _encodePlain(v)
+		if typeof(v) == "Color3" then
+			return { __fatal = "C3", R = v.R, G = v.G, B = v.B };
+		end;
+		if typeof(v) == "EnumItem" then
+			return { __fatal = "E", N = v.Name };
+		end;
+		if type(v) == "table" and typeof(v.Color) == "Color3" then
+			return { __fatal = "C3T", R = v.Color.R, G = v.Color.G, B = v.Color.B, T = v.Transparency or 0 };
+		end;
+		return v;
+	end;
+
+	local function _decodePlain(v)
+		if type(v) == "table" and v.__fatal == "C3" then
+			return Color3.new(tonumber(v.R) or 0, tonumber(v.G) or 0, tonumber(v.B) or 0);
+		end;
+		if type(v) == "table" and v.__fatal == "E" then
+			local ok, code = pcall(function()
+				return Enum.KeyCode[tostring(v.N)];
+			end);
+			if ok and code then
+				return code;
+			end;
+			return tostring(v.N);
+		end;
+		if type(v) == "table" and v.__fatal == "C3T" then
+			return { Color = Color3.new(tonumber(v.R) or 0, tonumber(v.G) or 0, tonumber(v.B) or 0), Transparency = tonumber(v.T) or 0 };
+		end;
+		return v;
+	end;
+
+	function Fatality.GetPlainFlags(window)
+		local out = {};
+		local ok, flags = pcall(function()
+			return window:GetFlags();
+		end);
+		if not ok or type(flags) ~= "table" then
+			return out;
+		end;
+		for id, el in pairs(flags) do
+			local okv, v = pcall(function()
+				return el:GetValue();
+			end);
+			if okv then
+				out[id] = v;
+			end;
+		end;
+		return out;
+	end;
+
+	function Fatality.ApplyPlainFlags(window, tbl)
+		if type(tbl) ~= "table" then
+			return 0;
+		end;
+		local ok, flags = pcall(function()
+			return window:GetFlags();
+		end);
+		if not ok or type(flags) ~= "table" then
+			return 0;
+		end;
+		window._FatalLoading = true;
+		local n = 0;
+		for id, v in pairs(tbl) do
+			local el = flags[id];
+			if el and type(el.SetValue) == "function" then
+				local dec = _decodePlain(v);
+				pcall(function()
+					if type(dec) == "table" and typeof(dec.Color) == "Color3" then
+						el:SetValue(dec.Color, dec.Transparency);
+					else
+						el:SetValue(dec);
+					end;
+				end);
+				n = n + 1;
+			end;
+		end;
+		window._FatalLoading = false;
+		return n;
+	end;
+
+	function Fatality.SnapshotDefaults(window)
+		window._FatalDefaults = Fatality.GetPlainFlags(window);
+		return window._FatalDefaults;
+	end;
+
+	function Fatality.ResetToDefaults(window)
+		if type(window._FatalDefaults) ~= "table" then
+			return 0;
+		end;
+		return Fatality.ApplyPlainFlags(window, window._FatalDefaults);
+	end;
+
+	function Fatality.ListConfigs(folder)
+		local out = {};
+		local ok, files = pcall(function()
+			if type(listfiles) == "function" then
+				return listfiles(folder);
+			end;
+			return {};
+		end);
+		if ok and type(files) == "table" then
+			for _, f in ipairs(files) do
+				local s = string.gsub(tostring(f), "\\", "/");
+				local base = s:match("([^/]+)$") or s;
+				if string.sub(base, -5) == ".json" then
+					table.insert(out, string.sub(base, 1, -6));
+				end;
+			end;
+		end;
+		table.sort(out);
+		return out;
+	end;
+
+	function Fatality.SaveNamed(window, folder, name)
+		name = tostring(name or "default");
+		if name == "" then
+			name = "default";
+		end;
+		pcall(function()
+			if type(makefolder) == "function" and type(isfolder) == "function" then
+				if not isfolder(folder) then
+					makefolder(folder);
+				end;
+			elseif type(makefolder) == "function" then
+				makefolder(folder);
+			end;
+		end);
+		local plain = Fatality.GetPlainFlags(window);
+		plain.__fatal_plain = true;
+		local enc = {};
+		for k, v in pairs(plain) do
+			enc[k] = _encodePlain(v);
+		end;
+		local js = _Http:JSONEncode(enc);
+		writefile(folder .. "/" .. name .. ".json", js);
+		return true;
+	end;
+
+	function Fatality.LoadNamed(window, folder, name)
+		name = tostring(name or "default");
+		if name == "" then
+			name = "default";
+		end;
+		local path = folder .. "/" .. name .. ".json";
+		local ok, hit = pcall(isfile, path);
+		if not (ok and hit) then
+			return false, "missing";
+		end;
+		local data = _Http:JSONDecode(readfile(path));
+		if type(data) ~= "table" then
+			return false, "corrupt";
+		end;
+		local n = Fatality.ApplyPlainFlags(window, data);
+		return true, n;
+	end;
+
+	function Fatality.DeleteNamed(folder, name)
+		name = tostring(name or "default");
+		pcall(delfile, folder .. "/" .. name .. ".json");
+		return true;
+	end;
+
+	function Fatality.BindConfigList(window, folder, dropdown, listbox, statusLabel, opts)
+		opts = opts or {};
+		local function setStatus(msg)
+			if statusLabel and type(statusLabel.SetText) == "function" then
+				pcall(function()
+					statusLabel:SetText(tostring(msg));
+				end);
+			end;
+		end;
+		local function currentList()
+			local l = Fatality.ListConfigs(folder);
+			if #l == 0 then
+				l = { "default" };
+			end;
+			return l;
+		end;
+		local function refresh(msg)
+			local l = currentList();
+			if dropdown then
+				pcall(function()
+					if type(dropdown.SetData) == "function" then
+						dropdown:SetData(l);
+					elseif type(dropdown.SetValues) == "function" then
+						dropdown:SetValues(l);
+					end;
+				end);
+			end;
+			if listbox and type(listbox.SetValues) == "function" then
+				pcall(function()
+					listbox:SetValues(l);
+					listbox:Refresh();
+				end);
+			end;
+			if msg then
+				setStatus(msg);
+			elseif opts.Quiet ~= true then
+				setStatus(tostring(#l) .. " configs");
+			end;
+			if opts.OnRefresh then
+				pcall(opts.OnRefresh, l);
+			end;
+			return l;
+		end;
+		return {
+			Refresh = refresh,
+			List = currentList,
+			Save = function(name)
+				local ok = Fatality.SaveNamed(window, folder, name);
+				if ok then
+					refresh("Saved " .. tostring(name));
+				end;
+				return ok;
+			end,
+			Load = function(name)
+				local ok, info = Fatality.LoadNamed(window, folder, name);
+				refresh(ok and ("Loaded " .. tostring(name)) or ("Missing " .. tostring(name)));
+				if opts.OnLoad then
+					pcall(opts.OnLoad, name, ok);
+				end;
+				return ok, info;
+			end,
+			Delete = function(name)
+				Fatality.DeleteNamed(folder, name);
+				refresh("Deleted " .. tostring(name));
+			end,
+		};
+	end;
+
+	function Fatality.EnableAutosave(window, folder, getName, interval)
+		interval = interval or 2;
+		local last = nil;
+		local stop = false;
+		task.spawn(function()
+			while not stop do
+				task.wait(interval);
+				pcall(function()
+					if window._FatalLoading then
+						return;
+					end;
+					if window._FatalAutosave ~= true then
+						return;
+					end;
+					local name = tostring(getName and getName() or "default");
+					if name == "" then
+						name = "default";
+					end;
+					local plain = Fatality.GetPlainFlags(window);
+					plain.__fatal_plain = true;
+					local enc = {};
+					for k, v in pairs(plain) do
+						enc[k] = _encodePlain(v);
+					end;
+					local js = _Http:JSONEncode(enc);
+					if js ~= last then
+						last = js;
+						pcall(function()
+							writefile(folder .. "/" .. name .. ".json", js);
+						end);
+					end;
+				end);
+			end;
+		end);
+		return function()
+			stop = true;
+		end;
+	end;
+
+	function Fatality.TryAutoload(window, folder, name)
+		if type(name) ~= "string" or name == "" then
+			return false;
+		end;
+		local ok, hit = pcall(isfile, folder .. "/" .. name .. ".json");
+		if not (ok and hit) then
+			return false;
+		end;
+		local ok2 = Fatality.LoadNamed(window, folder, name);
+		return ok2;
+	end;
+end;
+
 Fatality.FATALITY_PID = Fatality:RandomString();
 
 return Fatality;
