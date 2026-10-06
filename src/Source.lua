@@ -4704,7 +4704,7 @@ function Fatality.new(Window: Window)
 		UIListLayout.Parent = Left
 		UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-		UIListLayout.Padding = UDim.new(0, 5)
+		UIListLayout.Padding = UDim.new(0, 2)
 		UIListLayout.VerticalFlex = (Menu.AutoFill and Enum.UIFlexAlignment.Fill) or Enum.UIFlexAlignment.None;
 
 		Center.Name = Fatality:RandomString()
@@ -4723,7 +4723,7 @@ function Fatality.new(Window: Window)
 		UIListLayout_2.Parent = Center
 		UIListLayout_2.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		UIListLayout_2.SortOrder = Enum.SortOrder.LayoutOrder
-		UIListLayout_2.Padding = UDim.new(0, 5)
+		UIListLayout_2.Padding = UDim.new(0, 2)
 		UIListLayout_2.VerticalFlex = (Menu.AutoFill and Enum.UIFlexAlignment.Fill) or Enum.UIFlexAlignment.None;
 
 		Right.Name = Fatality:RandomString()
@@ -4742,7 +4742,7 @@ function Fatality.new(Window: Window)
 		UIListLayout_3.Parent = Right
 		UIListLayout_3.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		UIListLayout_3.SortOrder = Enum.SortOrder.LayoutOrder
-		UIListLayout_3.Padding = UDim.new(0, 5)
+		UIListLayout_3.Padding = UDim.new(0, 2)
 		UIListLayout_3.VerticalFlex = (Menu.AutoFill and Enum.UIFlexAlignment.Fill) or Enum.UIFlexAlignment.None;
 
 		local BindEvent = Instance.new('BindableEvent',MenuLiber);
@@ -5492,6 +5492,31 @@ function Fatality.new(Window: Window)
 			return res;
 		end;
 
+		local function clampSections()
+			for _, col in ipairs({ Left, Center, Right }) do
+				pcall(function()
+					for _, f in ipairs(col:GetChildren()) do
+						if typeof(f) == "Instance" and f:IsA("GuiObject") and f:GetAttribute("FatalSection") then
+							local pos = f.Position;
+							if pos.X.Scale ~= 0 or pos.X.Offset < 0 then
+								f.Position = UDim2.new(0, 0, pos.Y.Scale, pos.Y.Offset);
+							end;
+							local size = f.Size;
+							if size.X.Scale ~= 1 or size.X.Offset > 0 then
+								f.Size = UDim2.new(1, 0, size.Y.Scale, size.Y.Offset);
+							end;
+						end;
+					end;
+				end);
+			end;
+		end;
+
+		MenuLiber:GetPropertyChangedSignal("AbsoluteSize"):Connect(clampSections);
+
+		function MenuLib:ClampSections()
+			clampSections();
+		end;
+
 		function MenuLib:AddSection(Config : Section)
 			Config = Config or {};
 			Config.Name = Config.Name or "SECTION";
@@ -5549,6 +5574,7 @@ function Fatality.new(Window: Window)
 			Section.BorderSizePixel = 0
 			Section.ClipsDescendants = true
 			Section.Size = UDim2.new(1, 0, 0, 0)
+			Section:SetAttribute("FatalSection", true)
 
 			Elements.Name = Fatality:RandomString()
 			Elements.Parent = Section
@@ -5576,7 +5602,7 @@ function Fatality.new(Window: Window)
 			SpaceBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 			SpaceBox.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			SpaceBox.BorderSizePixel = 0
-			SpaceBox.Size = UDim2.new(0, 0, 0, 10)
+			SpaceBox.Size = UDim2.new(0, 0, 0, 14)
 
 			SectionName.Name = Fatality:RandomString()
 			SectionName.Parent = Section
@@ -5595,7 +5621,7 @@ function Fatality.new(Window: Window)
 
 
 			UIListLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
-				local MainScale = UIListLayout.AbsoluteContentSize.Y + 20 + Config.Height;
+				local MainScale = UIListLayout.AbsoluteContentSize.Y + 26 + Config.Height;
 
 				if not Menu.AutoFill then
 					Fatality:CreateAnimation(Section,0.25,{
@@ -5621,6 +5647,7 @@ function Fatality.new(Window: Window)
 				end,
 			});
 			_els._Section = Section;
+			clampSections();
 			return _els;
 		end;
 
