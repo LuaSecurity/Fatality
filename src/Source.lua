@@ -5625,8 +5625,16 @@ function Fatality.new(Window: Window)
 			for _, t in ipairs(Tabs) do
 				local on = (t == SelectedTab);
 				if t.Button then
-					t.Button.BackgroundTransparency = on and 0.85 or 1;
-					t.Button.TextColor3 = on and Fatality.Colors.Main or Color3.fromRGB(255, 255, 255);
+					Fatality:CreateAnimation(t.Button, 0.25, {
+						BackgroundTransparency = on and 0.85 or 1,
+						TextColor3 = on and Fatality.Colors.Main or Color3.fromRGB(255, 255, 255),
+					});
+				end;
+				if t.Bar then
+					Fatality:CreateAnimation(t.Bar, 0.25, {
+						BackgroundTransparency = on and 0 or 1,
+						Size = on and UDim2.new(0, 3, 1, -10) or UDim2.new(0, 3, 1, -18),
+					});
 				end;
 			end;
 		end;
@@ -5694,6 +5702,27 @@ function Fatality.new(Window: Window)
 			Fatality:ProtectText(Btn,TabConfig.Name);
 			Btn.MouseButton1Click:Connect(function()
 				selectTab(tab);
+			end);
+			local Bar = Instance.new("Frame");
+			Bar.Name = Fatality:RandomString();
+			Bar.Parent = Btn;
+			Bar.AnchorPoint = Vector2.new(0, 0.5);
+			Bar.BackgroundColor3 = Fatality.Colors.Main;
+			Bar.BorderSizePixel = 0;
+			Bar.Position = UDim2.new(0, 1, 0.5, 0);
+			Bar.Size = UDim2.new(0, 3, 1, -18);
+			Bar.BackgroundTransparency = 1;
+			local BarCorner = Instance.new("UICorner");
+			BarCorner.CornerRadius = UDim.new(0, 2);
+			BarCorner.Parent = Bar;
+			tab.Bar = Bar;
+			Fatality:CreateHover(Btn, function(hover)
+				if SelectedTab == tab then
+					return;
+				end;
+				Fatality:CreateAnimation(Btn, 0.2, {
+					BackgroundTransparency = hover and 0.9 or 1,
+				});
 			end);
 			tab.Button = Btn;
 			table.insert(Tabs, tab);
