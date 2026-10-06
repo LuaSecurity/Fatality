@@ -3947,6 +3947,18 @@ function Fatality.new(Window: Window)
 	Fatal.Notifier = Fatality.__NOTIFIER_CACHE or Fatality:CreateNotifier();
 
 	local Fatalitywin = Instance.new("ScreenGui")
+	do
+		local _shared = (typeof(getgenv) == "function" and getgenv()) or _G;
+		_shared.__FatalityGuis = _shared.__FatalityGuis or {};
+		for _, old in ipairs(_shared.__FatalityGuis) do
+			pcall(function()
+				if typeof(old) == "Instance" then
+					old:Destroy();
+				end;
+			end);
+		end;
+		_shared.__FatalityGuis = { Fatalitywin };
+	end;
 	local FatalFrame = Instance.new("Frame")
 	local UICorner = Instance.new("UICorner")
 	local DropShadow = Instance.new("ImageLabel")
@@ -5650,20 +5662,30 @@ function Fatality.new(Window: Window)
 			end;
 			if TabIndicator and idx > 0 then
 				Fatality:CreateAnimation(TabIndicator, 0.35, {
-					Position = UDim2.new(0, 2, 0, (idx - 1) * 28 + 6),
+					Position = UDim2.new(0, 8, 0, (idx - 1) * 28 + 11),
 				});
 			end;
 			restyleTabs();
 		end;
 
+		table.insert(Fatality._ThemeUpdaters, function()
+			if TabIndicator then
+				TabIndicator.BackgroundColor3 = Fatality.Colors.Main;
+			end;
+			restyleTabs();
+		end);
+
 		local function ensureTabsUI()
 			if TabsStrip then return; end;
-			Left.Position = UDim2.new(0.32, 0, 0.5, 0);
-			Left.Size = UDim2.new(0.26, 0, 1, -5);
-			Center.Position = UDim2.new(0.59, 0, 0.5, 0);
-			Center.Size = UDim2.new(0.26, 0, 1, -5);
-			Right.Position = UDim2.new(0.86, 0, 0.5, 0);
-			Right.Size = UDim2.new(0.26, 0, 1, -5);
+			Left.AnchorPoint = Vector2.new(0, 0.5);
+			Left.Position = UDim2.new(0, 122, 0.5, 0);
+			Left.Size = UDim2.new(1 / 3, -47.33, 1, -5);
+			Center.AnchorPoint = Vector2.new(0, 0.5);
+			Center.Position = UDim2.new(1 / 3, 80.67, 0.5, 0);
+			Center.Size = UDim2.new(1 / 3, -47.33, 1, -5);
+			Right.AnchorPoint = Vector2.new(0, 0.5);
+			Right.Position = UDim2.new(2 / 3, 39.33, 0.5, 0);
+			Right.Size = UDim2.new(1 / 3, -47.33, 1, -5);
 			TabsStrip = Instance.new("Frame");
 			local StripList = Instance.new("UIListLayout");
 			TabsStrip.Name = Fatality:RandomString();
@@ -5720,10 +5742,10 @@ function Fatality.new(Window: Window)
 			if not TabIndicator then
 				TabIndicator = Instance.new("Frame");
 				TabIndicator.Name = Fatality:RandomString();
-				TabIndicator.Parent = TabsStrip;
+				TabIndicator.Parent = MenuLiber;
 				TabIndicator.BackgroundColor3 = Fatality.Colors.Main;
 				TabIndicator.BorderSizePixel = 0;
-				TabIndicator.Position = UDim2.new(0, 2, 0, 6);
+				TabIndicator.Position = UDim2.new(0, 8, 0, 11);
 				TabIndicator.Size = UDim2.new(0, 3, 0, 12);
 				TabIndicator.BackgroundTransparency = 0;
 				local IndCorner = Instance.new("UICorner");
@@ -6783,6 +6805,40 @@ do
 
 	Fatality.UXVersion = "1.1";
 	Fatality._BindRegistry = Fatality._BindRegistry or {};
+	Fatality._ThemeUpdaters = Fatality._ThemeUpdaters or {};
+
+	Fatality.Themes = {
+		Default = { Main = Color3.fromRGB(255, 106, 133) },
+		Crimson = { Main = Color3.fromRGB(255, 60, 80) },
+		Azure = { Main = Color3.fromRGB(80, 170, 255) },
+		Emerald = { Main = Color3.fromRGB(60, 220, 130) },
+		Violet = { Main = Color3.fromRGB(170, 120, 255) },
+		Amber = { Main = Color3.fromRGB(255, 180, 80) },
+		Ghost = { Main = Color3.fromRGB(230, 230, 235) },
+	};
+
+	function Fatality.SetTheme(t)
+		local main = nil;
+		if type(t) == "string" then
+			local preset = Fatality.Themes and Fatality.Themes[t];
+			if preset then
+				main = preset.Main;
+			end;
+		elseif type(t) == "table" and typeof(t.Main) == "Color3" then
+			main = t.Main;
+		end;
+		if typeof(main) ~= "Color3" then
+			return false;
+		end;
+		Fatality.Colors.Main = main;
+		Fatality.CurrentTheme = main;
+		if Fatality._ThemeUpdaters then
+			for _, fn in ipairs(Fatality._ThemeUpdaters) do
+				pcall(fn);
+			end;
+		end;
+		return true;
+	end;
 
 	local function _normKey(k)
 		if typeof(k) == "EnumItem" then
