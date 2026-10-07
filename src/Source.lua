@@ -1410,6 +1410,7 @@ function Fatality:CreateDropdown(Parent: Frame, Default: string | {[string]: boo
 	local ScrollingFrame = Instance.new("ScrollingFrame")
 	local UIListLayout = Instance.new("UIListLayout")
 	local SPAWN_THREAD;
+	local opened = false;
 
 	Fatality:AddDragBlacklist(DropdownItemFrame);
 
@@ -1621,6 +1622,9 @@ function Fatality:CreateDropdown(Parent: Frame, Default: string | {[string]: boo
 						Selected = v;
 
 						Callback(v);
+						opened = false;
+						func(false);
+						Toggle(false);
 					end)
 				end;
 			end;
@@ -1630,17 +1634,25 @@ function Fatality:CreateDropdown(Parent: Frame, Default: string | {[string]: boo
 	});
 
 	Fatality:NewInput(Parent,function()
+		if opened then
+			opened = false;
+			func(false);
+			Toggle(false);
+			return;
+		end;
 		if AutoUpdate then
 			res:refresh();
 		end;
 
+		opened = true;
 		func(true);
 		Toggle(true);
 	end);
 
 	UserInputService.InputBegan:Connect(function(Input)
 		if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-			if not Fatality:IsMouseOverFrame(DropdownItemFrame) then
+			if not Fatality:IsMouseOverFrame(DropdownItemFrame) and not Fatality:IsMouseOverFrame(Parent) then
+				opened = false;
 				func(false);
 				Toggle(false);
 			end;
@@ -1857,6 +1869,12 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			end,
 			Flag = Config.Flag and (Config.Flag.."Toggle"),
 			Option = (Config.Option and Fatality:CreateOption(OptionButton)) or nil;
+			Frame = Toggle,
+			Destroy = function()
+				pcall(function()
+					Toggle:Destroy();
+				end);
+			end,
 		});
 
 		if Config.Flag then
@@ -2104,6 +2122,12 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			end,
 			Flag = Config.Flag and Config.Flag.."Slider",
 			Option = (Config.Option and Fatality:CreateOption(OptionButton)) or nil;
+			Frame = Slider,
+			Destroy = function()
+				pcall(function()
+					Slider:Destroy();
+				end);
+			end,
 		});
 
 		if Config.Flag then
@@ -2204,6 +2228,12 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			end,
 			Signal = Event.Event:Connect(OpcToggle),
 			Fire = Config.Callback,
+			Frame = Button,
+			Destroy = function()
+				pcall(function()
+					Button:Destroy();
+				end);
+			end,
 		})
 	end;
 
@@ -2596,6 +2626,12 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			end,
 			Flag = Config.Flag and Config.Flag.."Dropdown",
 			Option = (Config.Option and Fatality:CreateOption(OptionButton)) or nil;
+			Frame = Dropdown,
+			Destroy = function()
+				pcall(function()
+					Dropdown:Destroy();
+				end);
+			end,
 		});
 
 		if Config.Flag then
@@ -2830,6 +2866,12 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			end,
 			Flag = Config.Flag and Config.Flag.."Keybind",
 			Option = (Config.Option and Fatality:CreateOption(OptionButton)) or nil;
+			Frame = Keybind,
+			Destroy = function()
+				pcall(function()
+					Keybind:Destroy();
+				end);
+			end,
 		});
 
 		if Config.Flag then
@@ -5749,7 +5791,7 @@ function Fatality.new(Window: Window)
 				if t.Button then
 					Fatality:CreateAnimation(t.Button, 0.25, {
 						BackgroundTransparency = on and 0.85 or 1,
-						TextColor3 = on and Fatality.Colors.Main or Color3.fromRGB(255, 255, 255),
+						TextColor3 = on and Fatality.Colors.Main or Color3.fromRGB(150, 150, 150),
 					});
 				end;
 			end;
@@ -5827,7 +5869,7 @@ function Fatality.new(Window: Window)
 			Btn.Size = UDim2.new(1, 0, 0, 24);
 			Btn.FontFace = Fatality.FontSemiBold;
 			Btn.Text = TabConfig.Name;
-			Btn.TextColor3 = Color3.fromRGB(255, 255, 255);
+			Btn.TextColor3 = Color3.fromRGB(150, 150, 150);
 			Btn.TextSize = 13;
 			Btn.TextXAlignment = Enum.TextXAlignment.Left;
 			BtnPad.PaddingLeft = UDim.new(0, 14);
@@ -6978,12 +7020,14 @@ do
 			end;
 			local kn = string.lower(_inputKeyName(input));
 			for _, rec in ipairs(Fatality._BindRegistry) do
-				for _, k in ipairs(rec.Keys) do
-					if kn == _normKey(k) then
-						pcall(function()
-							rec.Press();
-						end);
-						break
+				if rec.Removed ~= true then
+					for _, k in ipairs(rec.Keys) do
+						if kn == _normKey(k) then
+							pcall(function()
+								rec.Press();
+							end);
+							break
+						end;
 					end;
 				end;
 			end;
@@ -6991,12 +7035,14 @@ do
 		_UIS.InputEnded:Connect(function(input)
 			local kn = string.lower(_inputKeyName(input));
 			for _, rec in ipairs(Fatality._BindRegistry) do
-				for _, k in ipairs(rec.Keys) do
-					if kn == _normKey(k) then
-						pcall(function()
-							rec.Release();
-						end);
-						break
+				if rec.Removed ~= true then
+					for _, k in ipairs(rec.Keys) do
+						if kn == _normKey(k) then
+							pcall(function()
+								rec.Release();
+							end);
+							break
+						end;
 					end;
 				end;
 			end;
@@ -7016,6 +7062,7 @@ do
 			SetTo = (opts.SetTo == nil) and true or opts.SetTo,
 			Held = false,
 			Pressed = false,
+			Removed = false,
 		};
 		local function cur()
 			local ok, v = pcall(function()
@@ -7063,6 +7110,15 @@ do
 		function rec.SetSetTo(v)
 			rec.SetTo = v;
 		end;
+		function rec.Remove()
+			rec.Removed = true;
+			for i, r in ipairs(Fatality._BindRegistry) do
+				if r == rec then
+					table.remove(Fatality._BindRegistry, i);
+					break;
+				end;
+			end;
+		end;
 		if opts.DefaultKey ~= nil then
 			rec.AddKey(opts.DefaultKey);
 		end;
@@ -7093,6 +7149,44 @@ do
 		local handles = { Toggle = toggle, Rows = {}, Count = 0 };
 		handles.Bind = nil;
 		if toggle and toggle.Option and type(toggle.Option.AddKeybind) == "function" then
+			local nextOrder = 0;
+			local function takeOrder()
+				nextOrder = nextOrder + 1;
+				return nextOrder;
+			end;
+			local function stamp(ctrl, order)
+				if ctrl and ctrl.Frame and typeof(ctrl.Frame) == "Instance" then
+					pcall(function()
+						ctrl.Frame.LayoutOrder = order or takeOrder();
+					end);
+				end;
+			end;
+			local function dropRow(row)
+				if row.rec and type(row.rec.Remove) == "function" then
+					pcall(function()
+						row.rec.Remove();
+					end);
+				end;
+				for _, c in ipairs({ row.key, row.mode, row.set, row.remove }) do
+					if c and type(c.Destroy) == "function" then
+						pcall(function()
+							c.Destroy();
+						end);
+					elseif c and c.Frame and typeof(c.Frame) == "Instance" then
+						pcall(function()
+							c.Frame:Destroy();
+						end);
+					end;
+				end;
+				for i, r in ipairs(handles.Rows) do
+					if r == row then
+						table.remove(handles.Rows, i);
+						break;
+					end;
+				end;
+				handles.Count = #handles.Rows;
+			end;
+			handles._bindNum = 1;
 			local function addBindRow(label, defMode, defSetTo, persist)
 				local idx = #handles.Rows + 1;
 				local rowRec = Fatality.BindToggle(toggle, { Mode = defMode, SetTo = defSetTo });
@@ -7106,6 +7200,7 @@ do
 						end;
 					end,
 				});
+				stamp(row.key);
 				row.mode = toggle.Option:AddDropdown({
 					Name = "Mode",
 					Values = cfg.Modes or { "Toggle", "Hold", "Always", "Set" },
@@ -7118,6 +7213,7 @@ do
 						end;
 					end,
 				});
+				stamp(row.mode);
 				row.set = toggle.Option:AddToggle({
 					Name = "Set to",
 					Default = defSetTo,
@@ -7129,6 +7225,16 @@ do
 						end;
 					end,
 				});
+				stamp(row.set);
+				if idx > 1 then
+					row.remove = toggle.Option:AddButton({
+						Name = "Remove",
+						Callback = function()
+							dropRow(row);
+						end,
+					});
+					stamp(row.remove);
+				end;
 				table.insert(handles.Rows, row);
 				handles.Count = #handles.Rows;
 				return row;
@@ -7145,12 +7251,14 @@ do
 					if handles.Rows[1] and handles.Rows[1].rec then
 						m, s = handles.Rows[1].rec.Mode, handles.Rows[1].rec.SetTo;
 					end;
-					addBindRow("Bind " .. tostring(#handles.Rows + 1), m, s, false);
+					handles._bindNum = handles._bindNum + 1;
+					addBindRow("Bind " .. tostring(handles._bindNum), m, s, false);
 					if cfg.OnBindAdded then
 						pcall(cfg.OnBindAdded, #handles.Rows);
 					end;
 				end,
 			});
+			stamp(handles.AddBtn, 1000000);
 		end;
 		return handles;
 	end;
@@ -7176,11 +7284,20 @@ do
 			end,
 		});
 		local function makeRec(target)
-			local rec = { Keys = {}, Target = target };
+			local rec = { Keys = {}, Target = target, Removed = false };
 			function rec.Press()
 				slider:SetValue(math.clamp(rec.Target, mn, mx));
 			end;
 			function rec.Release()
+			end;
+			function rec.Remove()
+				rec.Removed = true;
+				for i, r in ipairs(Fatality._BindRegistry) do
+					if r == rec then
+						table.remove(Fatality._BindRegistry, i);
+						break;
+					end;
+				end;
 			end;
 			function rec.AddKey(key)
 				if key == nil then
@@ -7203,6 +7320,44 @@ do
 		local handles = { Slider = slider, Rows = {}, Count = 0 };
 		handles.Bind = nil;
 		if slider and slider.Option and type(slider.Option.AddKeybind) == "function" then
+			local nextOrder = 0;
+			local function takeOrder()
+				nextOrder = nextOrder + 1;
+				return nextOrder;
+			end;
+			local function stamp(ctrl, order)
+				if ctrl and ctrl.Frame and typeof(ctrl.Frame) == "Instance" then
+					pcall(function()
+						ctrl.Frame.LayoutOrder = order or takeOrder();
+					end);
+				end;
+			end;
+			local function dropRow(row)
+				if row.rec and type(row.rec.Remove) == "function" then
+					pcall(function()
+						row.rec.Remove();
+					end);
+				end;
+				for _, c in ipairs({ row.key, row.val, row.remove }) do
+					if c and type(c.Destroy) == "function" then
+						pcall(function()
+							c.Destroy();
+						end);
+					elseif c and c.Frame and typeof(c.Frame) == "Instance" then
+						pcall(function()
+							c.Frame:Destroy();
+						end);
+					end;
+				end;
+				for i, r in ipairs(handles.Rows) do
+					if r == row then
+						table.remove(handles.Rows, i);
+						break;
+					end;
+				end;
+				handles.Count = #handles.Rows;
+			end;
+			handles._bindNum = 1;
 			local function addValueRow(label, defTarget, persist)
 				local idx = #handles.Rows + 1;
 				local rowRec = makeRec(defTarget);
@@ -7216,6 +7371,7 @@ do
 						end;
 					end,
 				});
+				stamp(row.key);
 				row.val = slider.Option:AddSlider({
 					Name = cfg.ValueName or "Set value",
 					Min = mn,
@@ -7229,6 +7385,16 @@ do
 						end;
 					end,
 				});
+				stamp(row.val);
+				if idx > 1 then
+					row.remove = slider.Option:AddButton({
+						Name = "Remove",
+						Callback = function()
+							dropRow(row);
+						end,
+					});
+					stamp(row.remove);
+				end;
 				table.insert(handles.Rows, row);
 				handles.Count = #handles.Rows;
 				return row;
@@ -7248,12 +7414,14 @@ do
 					if handles.Rows[1] and handles.Rows[1].rec then
 						t = handles.Rows[1].rec.Target;
 					end;
-					addValueRow("Bind " .. tostring(#handles.Rows + 1), t, false);
+					handles._bindNum = handles._bindNum + 1;
+					addValueRow("Bind " .. tostring(handles._bindNum), t, false);
 					if cfg.OnBindAdded then
 						pcall(cfg.OnBindAdded, #handles.Rows);
 					end;
 				end,
 			});
+			stamp(handles.AddBtn, 1000000);
 		end;
 		return handles;
 	end;
