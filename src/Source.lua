@@ -7581,6 +7581,574 @@ do
 		local ok2 = Fatality.LoadNamed(window, folder, name);
 		return ok2;
 	end;
+
+	function Fatality.EnsureConfigFolder(folder)
+		pcall(function()
+			if type(makefolder) == "function" and type(isfolder) == "function" then
+				if not isfolder(folder) then
+					makefolder(folder);
+				end;
+			elseif type(makefolder) == "function" then
+				makefolder(folder);
+			end;
+		end);
+		return true;
+	end;
+
+	function Fatality.ReadBoot(folder)
+		local ok, data = pcall(function()
+			return game:GetService("HttpService"):JSONDecode(readfile(folder .. "/" .. "_boot.json"));
+		end);
+		if ok and type(data) == "table" then
+			return data;
+		end;
+		return nil;
+	end;
+
+	function Fatality.WriteBoot(folder, autoload, config, last)
+		pcall(function()
+			Fatality.EnsureConfigFolder(folder);
+			local payload = {
+				autoload = autoload == true,
+				config = config,
+				last = last
+			};
+			writefile(folder .. "/" .. "_boot.json", game:GetService("HttpService"):JSONEncode(payload));
+		end);
+		return true;
+	end;
+
+	function Fatality.PickSingleValue(v, fallback)
+		if type(v) == "string" then
+			return v;
+		end;
+		if type(v) == "table" then
+			for kk, vv in pairs(v) do
+				if vv == true then
+					return tostring(kk);
+				end;
+			end;
+		end;
+		return fallback;
+	end;
+
+	function Fatality.ApplyThemeSelection(themeName, accent)
+		if themeName == "Custom" then
+			local c = accent;
+			if typeof(c) ~= "Color3" then
+				c = Color3.fromRGB(255, 106, 133);
+			end;
+			return Fatality.SetTheme({ Main = c });
+		end;
+		return Fatality.SetTheme(tostring(themeName or "Default"));
+	end;
+
+	function Fatality.BuildSettingsTab(window, settingsMenu, opts)
+		opts = opts or {};
+		local folder = opts.Folder or "ArchHook";
+		local notifier = opts.Notifier;
+		local version = opts.Version or "1.0";
+		local accentDefault = opts.AccentDefault;
+		if typeof(accentDefault) ~= "Color3" then
+			accentDefault = Color3.fromRGB(255, 106, 133);
+		end;
+		local menuDefault = opts.MenuDefault or "RightShift";
+		local pollInterval = opts.PollInterval or 2;
+		local sync = opts.Sync;
+		local themeValues = opts.Themes or { "Default", "Crimson", "Azure", "Emerald", "Violet", "Amber", "Ghost", "Custom" };
+		Fatality.EnsureConfigFolder(folder);
+		local configTab = Fatality.EnsureTab(settingsMenu, "Config");
+		local uiTab = Fatality.EnsureTab(settingsMenu, "UI");
+		local confSec = Fatality.EnsureSection(configTab, settingsMenu, "left", "CONFIG");
+		local actSec = Fatality.EnsureSection(configTab, settingsMenu, "center", "ACTIONS");
+		local autoSec = Fatality.EnsureSection(configTab, settingsMenu, "right", "AUTO");
+		local themeSec = Fatality.EnsureSection(uiTab, settingsMenu, "left", "THEME");
+		local menuSec = Fatality.EnsureSection(uiTab, settingsMenu, "center", "MENU");
+		local infoSec = Fatality.EnsureSection(uiTab, settingsMenu, "right", "INFO");
+		local state = {
+			configName = "default",
+			selectedName = "default",
+			autosaveOn = false,
+			autosavePick = "Follow selection",
+			autoloadOn = false,
+			autoloadPick = "Last used",
+			themePick = "Default",
+			accent = accentDefault,
+			menuKey = menuDefault,
+			lastConfig = "default"
+		};
+		local function syncSet(k, v)
+			if type(sync) == "table" then
+				sync[k] = v;
+			end;
+		end;
+		local function notify(title, content)
+			pcall(function()
+				if notifier and type(notifier.Notify) == "function" then
+					notifier:Notify({ Title = title, Content = content, Icon = "info" });
+				else
+					Fatality.__NOTIFIER_CACHE:Notify({ Title = title, Content = content, Icon = "info" });
+				end;
+			end);
+		end;
+		syncSet("Config name", state.configName);
+		syncSet("Selected config", state.selectedName);
+		syncSet("Autosave", false);
+		syncSet("Autosave config", state.autosavePick);
+		syncSet("Autoload", false);
+		syncSet("Autoload config", state.autoloadPick);
+		syncSet("Theme", state.themePick);
+		syncSet("Accent color", state.accent);
+		syncSet("Menu key", state.menuKey);
+		local function currentList()
+			local l = Fatality.ListConfigs(folder);
+			if #l == 0 then
+				l = { "default" };
+			end;
+			return l;
+		end;
+		local initList = currentList();
+		local statusLabel = nil;
+		pcall(function()
+			statusLabel = confSec:AddLabel({ Text = "Ready", Size = 13 });
+		end);
+		local nameBox = nil;
+		pcall(function()
+			nameBox = confSec:AddTextInput({
+				Name = "Config name",
+				Default = "default",
+				Placeholder = "cfg name",
+				MaxLength = 24,
+				Flag = "Config name",
+				Callback = function(v)
+					v = tostring(v or "default");
+					if v == "" then
+						v = "default";
+					end;
+					state.configName = v;
+					syncSet("Config name", v);
+				end
+			});
+		end);
+		local listDropdown = nil;
+		pcall(function()
+			listDropdown = confSec:AddDropdown({
+				Name = "Config list",
+				Values = initList,
+				Default = initList[1],
+				Flag = "Selected config",
+				Callback = function(v)
+					local pick = Fatality.PickSingleValue(v, initList[1]);
+					state.selectedName = tostring(pick);
+					state.configName = tostring(pick);
+					syncSet("Selected config", tostring(pick));
+					syncSet("Config name", tostring(pick));
+					if nameBox and type(nameBox.SetValue) == "function" then
+						pcall(function()
+							nameBox:SetValue(tostring(pick));
+						end);
+					end;
+				end
+			});
+		end);
+		local autosaveDropdown = nil;
+		local autoloadDropdown = nil;
+		local accentPicker = nil;
+		local menuBox = nil;
+		pcall(function()
+			menuBox = Fatality.WireMenuKey(window, state.menuKey);
+		end);
+		local function setStatus(msg)
+			if statusLabel and type(statusLabel.SetText) == "function" then
+				pcall(function()
+					statusLabel:SetText(tostring(msg));
+				end);
+			end;
+		end;
+		local function refreshLists(msg)
+			local l = currentList();
+			if listDropdown and type(listDropdown.SetData) == "function" then
+				pcall(function()
+					listDropdown:SetData(l);
+				end);
+			elseif listDropdown and type(listDropdown.SetValues) == "function" then
+				pcall(function()
+					listDropdown:SetValues(l);
+				end);
+			end;
+			local function refreshPick(ctrl, sentinel)
+				if ctrl and type(ctrl.SetData) == "function" then
+					pcall(function()
+						local vals = { sentinel };
+						for _, n in ipairs(l) do
+							if n ~= sentinel then
+								table.insert(vals, n);
+							end;
+						end;
+						ctrl:SetData(vals);
+					end);
+				elseif ctrl and type(ctrl.SetValues) == "function" then
+					pcall(function()
+						local vals = { sentinel };
+						for _, n in ipairs(l) do
+							if n ~= sentinel then
+								table.insert(vals, n);
+							end;
+						end;
+						ctrl:SetValues(vals);
+					end);
+				end;
+			end;
+			refreshPick(autosaveDropdown, "Follow selection");
+			refreshPick(autoloadDropdown, "Last used");
+			if msg then
+				setStatus(msg);
+			else
+				setStatus(tostring(#l) .. " configs found");
+			end;
+			return l;
+		end;
+		local function resolveAutosaveName()
+			if state.autosavePick == nil or state.autosavePick == "Follow selection" then
+				return tostring(state.selectedName or state.configName or "default");
+			end;
+			return tostring(state.autosavePick);
+		end;
+		local function persistBoot()
+			Fatality.WriteBoot(folder, state.autoloadOn, state.autoloadPick, state.lastConfig);
+		end;
+		local function applyThemeNow()
+			Fatality.ApplyThemeSelection(state.themePick, state.accent);
+		end;
+		local handle = {};
+		function handle.Refresh(msg)
+			return refreshLists(msg);
+		end;
+		function handle.List()
+			return currentList();
+		end;
+		function handle.GetSelected()
+			return tostring(state.selectedName or state.configName or "default");
+		end;
+		function handle.GetConfigName()
+			return tostring(state.configName or "default");
+		end;
+		function handle.Save(name)
+			name = tostring(name or state.configName or "default");
+			if name == "" then
+				name = "default";
+			end;
+			local ok = Fatality.SaveNamed(window, folder, name);
+			if ok then
+				state.configName = name;
+				state.selectedName = name;
+				state.lastConfig = name;
+				syncSet("Config name", name);
+				syncSet("Selected config", name);
+				syncSet("Last config", name);
+				if nameBox and type(nameBox.SetValue) == "function" then
+					pcall(function()
+						nameBox:SetValue(name);
+					end);
+				end;
+				persistBoot();
+				refreshLists("Saved " .. name);
+			end;
+			return ok;
+		end;
+		function handle.Load(name)
+			name = tostring(name or state.selectedName or state.configName or "default");
+			if name == "" then
+				name = "default";
+			end;
+			local ok, info = Fatality.LoadNamed(window, folder, name);
+			if ok then
+				state.configName = name;
+				state.selectedName = name;
+				state.lastConfig = name;
+				syncSet("Config name", name);
+				syncSet("Selected config", name);
+				syncSet("Last config", name);
+				if nameBox and type(nameBox.SetValue) == "function" then
+					pcall(function()
+						nameBox:SetValue(name);
+					end);
+				end;
+				pcall(function()
+					local flags = window:GetFlags();
+					local themeEl = flags["ThemeDropdown"];
+					if themeEl and type(themeEl.GetValue) == "function" then
+						local tv = themeEl:GetValue();
+						if type(tv) == "string" then
+							state.themePick = tv;
+							syncSet("Theme", tv);
+						end;
+					end;
+					local accentEl = flags["Accent colorColorPicker"];
+					if accentEl and type(accentEl.GetValue) == "function" then
+						local av = accentEl:GetValue();
+						if type(av) == "table" and typeof(av.Color) == "Color3" then
+							state.accent = av.Color;
+							syncSet("Accent color", av.Color);
+						elseif typeof(av) == "Color3" then
+							state.accent = av;
+							syncSet("Accent color", av);
+						end;
+					end;
+				end);
+				applyThemeNow();
+				persistBoot();
+				refreshLists("Loaded " .. name);
+			else
+				refreshLists("Missing " .. name);
+			end;
+			return ok, info;
+		end;
+		function handle.Delete(name)
+			name = tostring(name or state.selectedName or state.configName or "default");
+			Fatality.DeleteNamed(folder, name);
+			refreshLists("Deleted " .. name);
+			return true;
+		end;
+		function handle.Reset()
+			local n = Fatality.ResetToDefaults(window);
+			applyThemeNow();
+			setStatus("Defaults restored");
+			return n;
+		end;
+		function handle.MarkDirty()
+			return true;
+		end;
+		pcall(function()
+			actSec:AddButton({ Name = "Save config", Callback = function()
+				handle.Save(handle.GetConfigName());
+				notify("FATALITY", "Config saved");
+			end });
+		end);
+		pcall(function()
+			actSec:AddButton({ Name = "Load config", Callback = function()
+				handle.Load(handle.GetSelected());
+				notify("FATALITY", "Config loaded");
+			end });
+		end);
+		pcall(function()
+			actSec:AddButton({ Name = "Delete config", Callback = function()
+				handle.Delete(handle.GetSelected());
+				notify("FATALITY", "Config deleted");
+			end });
+		end);
+		pcall(function()
+			actSec:AddButton({ Name = "Refresh list", Callback = function()
+				handle.Refresh();
+			end });
+		end);
+		pcall(function()
+			actSec:AddButton({ Name = "Reset defaults", Callback = function()
+				handle.Reset();
+			end });
+		end);
+		pcall(function()
+			autoSec:AddToggle({
+				Name = "Autosave",
+				Default = false,
+				Flag = "Autosave",
+				Callback = function(v)
+					state.autosaveOn = v == true;
+					window._FatalAutosave = state.autosaveOn;
+					syncSet("Autosave", state.autosaveOn);
+					persistBoot();
+				end
+			});
+		end);
+		pcall(function()
+			local asVals = { "Follow selection" };
+			for _, n in ipairs(initList) do
+				if n ~= "Follow selection" then
+					table.insert(asVals, n);
+				end;
+			end;
+			autosaveDropdown = autoSec:AddDropdown({
+				Name = "Autosave config",
+				Values = asVals,
+				Default = "Follow selection",
+				Flag = "Autosave config",
+				Callback = function(v)
+					state.autosavePick = Fatality.PickSingleValue(v, "Follow selection");
+					syncSet("Autosave config", state.autosavePick);
+					persistBoot();
+				end
+			});
+		end);
+		pcall(function()
+			autoSec:AddToggle({
+				Name = "Autoload last config",
+				Default = false,
+				Flag = "Autoload",
+				Callback = function(v)
+					state.autoloadOn = v == true;
+					syncSet("Autoload", state.autoloadOn);
+					persistBoot();
+				end
+			});
+		end);
+		pcall(function()
+			local alVals = { "Last used" };
+			for _, n in ipairs(initList) do
+				if n ~= "Last used" then
+					table.insert(alVals, n);
+				end;
+			end;
+			autoloadDropdown = autoSec:AddDropdown({
+				Name = "Autoload config",
+				Values = alVals,
+				Default = "Last used",
+				Flag = "Autoload config",
+				Callback = function(v)
+					state.autoloadPick = Fatality.PickSingleValue(v, "Last used");
+					syncSet("Autoload config", state.autoloadPick);
+					persistBoot();
+				end
+			});
+		end);
+		pcall(function()
+			themeSec:AddDropdown({
+				Name = "Theme",
+				Values = themeValues,
+				Default = "Default",
+				Flag = "Theme",
+				Callback = function(v)
+					local pick = Fatality.PickSingleValue(v, "Default");
+					state.themePick = tostring(pick);
+					syncSet("Theme", state.themePick);
+					if state.themePick ~= "Custom" then
+						pcall(function()
+							local preset = Fatality.Themes and Fatality.Themes[state.themePick];
+							if preset and typeof(preset.Main) == "Color3" and accentPicker and type(accentPicker.SetValue) == "function" then
+								accentPicker:SetValue(preset.Main, 0);
+							end;
+						end);
+					end;
+					if window._FatalLoading ~= true then
+						applyThemeNow();
+					end;
+				end
+			});
+		end);
+		pcall(function()
+			accentPicker = themeSec:AddColorPicker({
+				Name = "Accent color",
+				Default = accentDefault,
+				Flag = "Accent color",
+				Callback = function(v)
+					local c = v;
+					if type(c) == "table" and typeof(c.Color) == "Color3" then
+						c = c.Color;
+					end;
+					if typeof(c) == "Color3" then
+						state.accent = c;
+						syncSet("Accent color", c);
+						if state.themePick == "Custom" and window._FatalLoading ~= true then
+							applyThemeNow();
+						end;
+					end;
+				end
+			});
+		end);
+		pcall(function()
+			menuSec:AddKeybind({
+				Name = "Menu key",
+				Default = menuDefault,
+				Flag = "Menu key",
+				Callback = function(v)
+					state.menuKey = v;
+					syncSet("Menu key", v);
+					if menuBox then
+						menuBox.Key = v;
+					end;
+				end
+			});
+		end);
+		if type(Fatality.WireMenuKey) == "function" and menuBox == nil then
+			pcall(function()
+				menuBox = Fatality.WireMenuKey(window, state.menuKey);
+			end);
+		end;
+		pcall(function()
+			menuSec:AddButton({ Name = "About", Callback = function()
+				if type(opts.OnAbout) == "function" then
+					pcall(opts.OnAbout);
+				else
+					notify("FATALITY", "Helpers ready");
+				end;
+			end });
+		end);
+		pcall(function()
+			menuSec:AddButton({ Name = "Unload", Risky = true, Callback = function()
+				if type(opts.OnUnload) == "function" then
+					pcall(opts.OnUnload);
+				end;
+			end });
+		end);
+		local infoLabel = nil;
+		pcall(function()
+			infoLabel = infoSec:AddLabel({ Text = "Fatality " .. tostring(version) .. " UX " .. tostring(Fatality.UXVersion or "1.0"), Size = 13 });
+		end);
+		handle._statusLabel = statusLabel;
+		handle._infoLabel = infoLabel;
+		handle._menuBox = menuBox;
+		handle._window = window;
+		handle._folder = folder;
+		pcall(function()
+			Fatality.SnapshotDefaults(window);
+		end);
+		refreshLists("Ready");
+		applyThemeNow();
+		window._FatalAutosave = false;
+		pcall(function()
+			handle._stopAutosave = Fatality.EnableAutosave(window, folder, resolveAutosaveName, pollInterval);
+		end);
+		pcall(function()
+			local boot = Fatality.ReadBoot(folder);
+			if boot and boot.autoload == true then
+				local target = nil;
+				if type(boot.config) == "string" and boot.config ~= "" and boot.config ~= "Last used" then
+					target = boot.config;
+				elseif type(boot.last) == "string" and boot.last ~= "" then
+					target = boot.last;
+				end;
+				if target then
+					state.autoloadOn = true;
+					window._FatalAutosave = state.autosaveOn;
+					syncSet("Autoload", true);
+					if type(boot.config) == "string" and boot.config ~= "" then
+						state.autoloadPick = boot.config;
+						syncSet("Autoload config", boot.config);
+						if autoloadDropdown and type(autoloadDropdown.SetValue) == "function" then
+							pcall(function()
+								autoloadDropdown:SetValue(boot.config);
+							end);
+						end;
+					end;
+					handle.Load(target);
+				end;
+			end;
+		end);
+		if type(opts.InfoProvider) == "function" then
+			task.spawn(function()
+				while task.wait(2) do
+					pcall(function()
+						if infoLabel and type(infoLabel.SetText) == "function" then
+							local txt = opts.InfoProvider();
+							if type(txt) == "string" and txt ~= "" then
+								infoLabel:SetText(txt);
+							end;
+						end;
+					end);
+				end;
+			end);
+		end;
+		return handle;
+	end;
 end;
 
 Fatality.FATALITY_PID = Fatality:RandomString();
