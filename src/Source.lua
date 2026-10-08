@@ -3522,7 +3522,11 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 
 		local vCam = Instance.new("Camera")
 		vCam.FieldOfView = 60
+		pcall(function()
+			vCam.Parent = View
+		end)
 		View.CurrentCamera = vCam
+		local lastFix = ""
 
 		local clonedFrom = nil;
 		local model = nil;
@@ -3651,6 +3655,26 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 						Placeholder.Visible = true;
 						return;
 					end;
+					pcall(function()
+						local fixes = {};
+						if View.CurrentCamera ~= vCam then
+							View.CurrentCamera = vCam;
+							table.insert(fixes, "cam");
+						end;
+						if World.Parent ~= View then
+							World.Parent = View;
+							table.insert(fixes, "world");
+						end;
+						if model.Parent ~= World then
+							model.Parent = World;
+							table.insert(fixes, "model");
+						end;
+						local key = table.concat(fixes, ",");
+						if key ~= "" and key ~= lastFix then
+							lastFix = key;
+							print("PreviewDbg refixed " .. key);
+						end;
+					end);
 					local data = {};
 					pcall(function()
 						data = Config.Provider() or {};
