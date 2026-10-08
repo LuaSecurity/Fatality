@@ -650,7 +650,10 @@ function Fatality:CreateOption(OptionButton: ImageButton): Elements
 
 	local SPAWN_THREAD;
 
+	local extOpened = false;
+
 	local ToggleExt = function(bool)
+		extOpened = (bool == true);
 		if bool then
 			Bindable:SetAttribute('V',true);
 			Bindable:Fire(true);
@@ -720,7 +723,9 @@ function Fatality:CreateOption(OptionButton: ImageButton): Elements
 
 	UserInputService.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-			if not Fatality:IsMouseOverFrame(ExtElementFrame) and not Fatality.GLOBAL_ENVIRONMENT.IS_HOLD_COLOR_PICKER then
+			-- Guard: closed option panels used to run hit-tests + Fire(false)
+			-- (cascading into child tweens) + 3 tweens on EVERY global click.
+			if extOpened and not Fatality:IsMouseOverFrame(ExtElementFrame) and not Fatality.GLOBAL_ENVIRONMENT.IS_HOLD_COLOR_PICKER then
 				ToggleExt(false);
 			end;
 		end;
@@ -1660,6 +1665,12 @@ function Fatality:CreateDropdown(Parent: Frame, Default: string | {[string]: boo
 
 	UserInputService.InputBegan:Connect(function(Input)
 		if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+			-- Guard: closed dropdowns used to run 2 hit-tests + 5 tweens on
+			-- EVERY global click (including in-game shots with the menu
+			-- closed) — ~125 tweens per click across the whole menu.
+			if not opened then
+				return;
+			end;
 			if not Fatality:IsMouseOverFrame(DropdownItemFrame) and not Fatality:IsMouseOverFrame(Parent) then
 				opened = false;
 				func(false);
