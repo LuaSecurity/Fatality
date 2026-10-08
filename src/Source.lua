@@ -3479,6 +3479,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		local wantRotate = true;
 		local rotConn = nil;
 		local previewData = {};
+		local lastTheta = 0;
 
 		local function updateViewport(char)
 			if not char then
@@ -3619,8 +3620,8 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		end;
 
 		local function drawOverlay(hrp)
-			local head = characterClone and characterClone:FindFirstChild("Head");
-			if not head then
+			local data = previewData or {};
+			if data.showESP == false then
 				hideOverlay();
 				return;
 			end;
@@ -3629,35 +3630,14 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 				hideOverlay();
 				return;
 			end;
-			pcall(function()
-				vCam.ViewportSize = vs;
-			end);
-			local pTop, pFeet = nil, nil;
-			pcall(function()
-				local sp, vis = vCam:WorldToViewportPoint(head.Position + Vector3.new(0, 0.6, 0));
-				if vis then
-					pTop = Vector2.new(sp.X, sp.Y);
-				end;
-			end);
-			pcall(function()
-				local sp, vis = vCam:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3.2, 0));
-				if vis then
-					pFeet = Vector2.new(sp.X, sp.Y);
-				end;
-			end);
-			if not pTop or not pFeet then
-				hideOverlay();
-				return;
+			local h = vs.Y * 0.78;
+			local w = vs.X * 0.30 * (0.65 + 0.35 * math.abs(math.cos(lastTheta)));
+			if w < 8 then
+				w = 8;
 			end;
-			local h = math.abs(pFeet.Y - pTop.Y);
-			if h < 4 then
-				h = 4;
-			end;
-			local w = h / 2;
-			local cx = pFeet.X;
+			local cx = vs.X / 2;
 			local left = cx - w / 2;
-			local top = math.min(pTop.Y, pFeet.Y);
-			local data = previewData or {};
+			local top = (vs.Y - h) / 2;
 			if data.showBox ~= false then
 				local cT, cB, cM;
 				if data.boxStyle == "Gradient" then
@@ -3845,10 +3825,12 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 				end;
 				if wantRotate then
 					local theta = tick() * 0.9;
+					lastTheta = theta;
 					pcall(function()
 						vCam.CFrame = CFrame.new(hrp.Position + Vector3.new(math.sin(theta) * 5, 2, math.cos(theta) * 5), hrp.Position);
 					end);
 				else
+					lastTheta = 0;
 					pcall(function()
 						vCam.CFrame = CFrame.new(Vector3.new(0, 2, 5), hrp.Position);
 					end);
