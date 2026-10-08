@@ -53,6 +53,7 @@ export type Preview = {
 	Name: string,
 	Height: number?,
 	Flag: string | nil,
+	Elevate: ((() -> any) -> any)?,
 	Provider: (() -> any)?,
 }
 
@@ -3526,6 +3527,12 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		local clonedFrom = nil;
 		local model = nil;
 		local wantRefresh = false;
+		local runElevated = Config.Elevate;
+		if type(runElevated) ~= "function" then
+			runElevated = function(fn)
+				return pcall(fn);
+			end;
+		end;
 
 		local function clearModel()
 			if model then
@@ -3619,7 +3626,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		task.spawn(function()
 			while Box.Parent do
 				task.wait(0.15);
-				pcall(function()
+				runElevated(function()
 					local vs = View.AbsoluteSize;
 					if vs.X < 10 or vs.Y < 10 then
 						return;
