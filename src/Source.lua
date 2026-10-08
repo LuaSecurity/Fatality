@@ -49,6 +49,13 @@ export type Listbox = {
 	Callback: (values: {ValueBase}) -> any
 }
 
+export type Preview = {
+	Name: string,
+	Height: number?,
+	Flag: string | nil,
+	Provider: (() -> any)?,
+}
+
 export type Elements = {
 	AddToggle: (self,Config: Toggle) -> {
 		Option: Elements	
@@ -73,6 +80,7 @@ export type Elements = {
 		Option: Elements	
 	},
 	AddLabel: (self,Config: Label) -> {},
+	AddPreview: (self,Config: Preview) -> {},
 }
 
 export type IntInput = {
@@ -1888,7 +1896,9 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		Config = Config or {};
 		Config.Name = Config.Name or "Slider";
 		Config.Type = Config.Type or "";
-		Config.Default = Config.Default or 50;
+		if Config.Default == nil then
+			Config.Default = 50;
+		end;
 		Config.Min = Config.Min or 0;
 		Config.Max = Config.Max or 100;
 		Config.Round = Config.Round or 0;
@@ -2372,6 +2382,12 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			end,
 			Flag = Config.Flag and Config.Flag.."ColorPicker",
 			Option = (Config.Option and Fatality:CreateOption(OptionButton)) or nil;
+			Frame = ColorPicker,
+			Destroy = function()
+				pcall(function()
+					ColorPicker:Destroy();
+				end);
+			end,
 		});
 
 		if Config.Flag then
@@ -3368,6 +3384,375 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 
 		if Config.Flag then
 			Fatality.WindowFlags[FatalWindow][Config.Flag.."Label"] = Respons;
+		end;
+
+		return Respons;
+	end;
+
+	function elements:AddPreview(Config: Preview)
+		Config = Config or {};
+		Config.Name = Config.Name or "Preview";
+		Config.Height = Config.Height or 240;
+		Config.Provider = Config.Provider or function()
+			return {};
+		end;
+		Config.Flag = Config.Flag or nil;
+
+		local Box = Instance.new("Frame")
+		local BoxCorner = Instance.new("UICorner")
+		local Title = Instance.new("TextLabel")
+		local View = Instance.new("ViewportFrame")
+		local Overlay = Instance.new("Frame")
+		local Placeholder = Instance.new("TextLabel")
+
+		if SearchAPI then
+			SearchAPI.Memory(Config.Name);
+		end;
+
+		Box.Name = Fatality:RandomString()
+		Box.Parent = Parent
+		Box.BackgroundColor3 = Fatality.Colors.Black
+		Box.BackgroundTransparency = 0.300
+		Box.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		Box.BorderSizePixel = 0
+		Box.Size = UDim2.new(1, -25, 0, Config.Height)
+		Box.ZIndex = ZIndex + 1
+		Box.ClipsDescendants = true
+		Fatality:AddDragBlacklist(Box);
+
+		BoxCorner.CornerRadius = UDim.new(0, 3)
+		BoxCorner.Parent = Box
+
+		Title.Name = Fatality:RandomString()
+		Title.Parent = Box
+		Title.BackgroundTransparency = 1.000
+		Title.Position = UDim2.new(0, 8, 0, 2)
+		Title.Size = UDim2.new(1, -16, 0, 14)
+		Title.ZIndex = ZIndex + 4
+		Title.FontFace = Fatality.FontSemiBold
+		Title.Text = Config.Name
+		Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+		Title.TextSize = 12.000
+		Title.TextTransparency = 0.400
+		Title.TextXAlignment = Enum.TextXAlignment.Left
+		Fatality:ProtectText(Title,Config.Name);
+
+		View.Name = Fatality:RandomString()
+		View.Parent = Box
+		View.BackgroundTransparency = 1.000
+		View.BorderSizePixel = 0
+		View.Position = UDim2.new(0, 6, 0, 20)
+		View.Size = UDim2.new(1, -12, 1, -26)
+		View.ZIndex = ZIndex + 2
+
+		Overlay.Name = Fatality:RandomString()
+		Overlay.Parent = View
+		Overlay.BackgroundTransparency = 1.000
+		Overlay.BorderSizePixel = 0
+		Overlay.Size = UDim2.new(1, 0, 1, 0)
+		Overlay.ZIndex = ZIndex + 3
+		Overlay.ClipsDescendants = true
+
+		Placeholder.Name = Fatality:RandomString()
+		Placeholder.Parent = Overlay
+		Placeholder.AnchorPoint = Vector2.new(0.5, 0.5)
+		Placeholder.BackgroundTransparency = 1.000
+		Placeholder.Position = UDim2.new(0.5, 0, 0.5, 0)
+		Placeholder.Size = UDim2.new(1, -20, 0, 16)
+		Placeholder.ZIndex = ZIndex + 4
+		Placeholder.FontFace = Fatality.FontSemiBold
+		Placeholder.Text = "No character"
+		Placeholder.TextColor3 = Color3.fromRGB(255, 255, 255)
+		Placeholder.TextSize = 12.000
+		Placeholder.TextTransparency = 0.500
+		Placeholder.Visible = false
+
+		local function mkEdge()
+			local f = Instance.new("Frame")
+			f.BorderSizePixel = 0
+			f.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			f.Visible = false
+			f.ZIndex = ZIndex + 4
+			f.Parent = Overlay
+			return f
+		end;
+
+		local edgeT, edgeB, edgeL, edgeR = mkEdge(), mkEdge(), mkEdge(), mkEdge();
+		local hbBg, hbFill = mkEdge(), mkEdge();
+		hbBg.BackgroundColor3 = Color3.fromRGB(20, 20, 20);
+
+		local nameL = Instance.new("TextLabel")
+		nameL.BackgroundTransparency = 1.000
+		nameL.AnchorPoint = Vector2.new(0.5, 1)
+		nameL.Size = UDim2.new(1, -10, 0, 14)
+		nameL.ZIndex = ZIndex + 4
+		nameL.FontFace = Fatality.FontSemiBold
+		nameL.TextColor3 = Color3.fromRGB(255, 255, 255)
+		nameL.TextSize = 13.000
+		nameL.TextStrokeTransparency = 0.500
+		nameL.Visible = false
+		nameL.Parent = Overlay
+
+		local subL = Instance.new("TextLabel")
+		subL.BackgroundTransparency = 1.000
+		subL.AnchorPoint = Vector2.new(0.5, 0)
+		subL.Size = UDim2.new(1, -10, 0, 13)
+		subL.ZIndex = ZIndex + 4
+		subL.FontFace = Fatality.FontSemiBold
+		subL.TextColor3 = Color3.fromRGB(220, 220, 220)
+		subL.TextSize = 12.000
+		subL.TextStrokeTransparency = 0.500
+		subL.Visible = false
+		subL.Parent = Overlay
+
+		local tracer = Instance.new("Frame")
+		tracer.BorderSizePixel = 0
+		tracer.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		tracer.AnchorPoint = Vector2.new(0.5, 0.5)
+		tracer.Visible = false
+		tracer.ZIndex = ZIndex + 3
+		tracer.Parent = Overlay
+
+		local vCam = Instance.new("Camera")
+		vCam.FieldOfView = 60
+		View.CurrentCamera = vCam
+
+		local clonedFrom = nil;
+		local model = nil;
+	 local wantRefresh = false;
+
+		local function clearModel()
+			if model then
+				pcall(function()
+					model:Destroy()
+				end)
+			end;
+			model = nil;
+			clonedFrom = nil;
+		end;
+
+		local function refreshModel()
+			clearModel();
+			local okChar = nil;
+			pcall(function()
+				okChar = game:GetService("Players").LocalPlayer.Character
+			end);
+			if not okChar then
+				return false;
+			end;
+			local ok, clone = pcall(function()
+				return okChar:Clone()
+			end);
+			if not ok or not clone then
+				return false;
+			end;
+			pcall(function()
+				clone.Parent = View
+			end);
+			if not clone.Parent then
+				pcall(function()
+					clone:Destroy()
+				end);
+				return false;
+			end;
+			model = clone;
+			clonedFrom = okChar;
+			return true;
+		end;
+
+		local function project(p)
+			local sp, vis = vCam:WorldToViewportPoint(p)
+			if not vis then
+				return nil;
+			end;
+			return Vector2.new(sp.X, sp.Y);
+		end;
+
+		local function setTracer(a, b, color)
+			local d = b - a;
+			local len = d.Magnitude;
+			if len < 2 then
+				tracer.Visible = false;
+				return;
+			end;
+			tracer.Position = UDim2.fromOffset((a.X + b.X) / 2, (a.Y + b.Y) / 2);
+			tracer.Size = UDim2.fromOffset(len, 1);
+			tracer.Rotation = math.deg(math.atan2(d.Y, d.X));
+			tracer.BackgroundColor3 = color;
+			tracer.Visible = true;
+		end;
+
+		local function hideAll()
+			edgeT.Visible = false;
+			edgeB.Visible = false;
+			edgeL.Visible = false;
+			edgeR.Visible = false;
+			hbBg.Visible = false;
+			hbFill.Visible = false;
+			nameL.Visible = false;
+			subL.Visible = false;
+			tracer.Visible = false;
+		end;
+
+		task.spawn(function()
+			while Box.Parent do
+				task.wait(0.15);
+				pcall(function()
+					local vs = View.AbsoluteSize;
+					if vs.X < 10 or vs.Y < 10 then
+						return;
+					end;
+					local data = Config.Provider() or {};
+					local char = nil;
+					pcall(function()
+						char = game:GetService("Players").LocalPlayer.Character
+					end);
+					if not char then
+						clearModel();
+						hideAll();
+						Placeholder.Visible = true;
+						return;
+					end;
+					Placeholder.Visible = false;
+					if char ~= clonedFrom or wantRefresh or not model or not model.Parent then
+						wantRefresh = false;
+						refreshModel();
+					end;
+					if not model then
+						hideAll();
+						Placeholder.Visible = true;
+						return;
+					end;
+					pcall(function()
+						model:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, tick() * 0.35 % 6.283185307179586, 0));
+					end);
+					vCam.ViewportSize = vs;
+					vCam.CFrame = CFrame.new(Vector3.new(0, 0.6, 8.5), Vector3.new(0, -0.3, 0));
+					local root = model:FindFirstChild("HumanoidRootPart");
+					local head = model:FindFirstChild("Head");
+					if not root or not head then
+						hideAll();
+						return;
+					end;
+					local pTop = project(head.Position + Vector3.new(0, 0.6, 0));
+					local pFeet = project(root.Position - Vector3.new(0, 3.2, 0));
+					if not pTop or not pFeet then
+						hideAll();
+						return;
+					end;
+					local h = math.abs(pFeet.Y - pTop.Y);
+					if h < 4 then
+						h = 4;
+					end;
+					local w = h / 2;
+					local cx = pFeet.X;
+					local left = cx - w / 2;
+					local top = math.min(pTop.Y, pFeet.Y);
+					local boxColor = data.boxColor;
+					if typeof(boxColor) ~= "Color3" then
+						boxColor = Color3.fromRGB(255, 60, 80);
+					end;
+					if data.showBox ~= false then
+						edgeT.Position = UDim2.fromOffset(left, top);
+						edgeT.Size = UDim2.fromOffset(w, 1);
+						edgeT.BackgroundColor3 = boxColor;
+						edgeT.Visible = true;
+						edgeB.Position = UDim2.fromOffset(left, top + h);
+						edgeB.Size = UDim2.fromOffset(w, 1);
+						edgeB.BackgroundColor3 = boxColor;
+						edgeB.Visible = true;
+						edgeL.Position = UDim2.fromOffset(left, top);
+						edgeL.Size = UDim2.fromOffset(1, h);
+						edgeL.BackgroundColor3 = boxColor;
+						edgeL.Visible = true;
+						edgeR.Position = UDim2.fromOffset(left + w, top);
+						edgeR.Size = UDim2.fromOffset(1, h);
+						edgeR.BackgroundColor3 = boxColor;
+						edgeR.Visible = true;
+					else
+						edgeT.Visible = false;
+						edgeB.Visible = false;
+						edgeL.Visible = false;
+						edgeR.Visible = false;
+					end;
+					local pct = tonumber(data.healthPct) or 1;
+					if pct < 0 then
+						pct = 0;
+					end;
+					if pct > 1 then
+						pct = 1;
+					end;
+					if data.showHealth ~= false then
+						local hbC = data.healthColor;
+						if typeof(hbC) ~= "Color3" then
+							hbC = Color3.fromRGB(0, 255, 0);
+						end;
+						hbBg.Position = UDim2.fromOffset(left - 5, top);
+						hbBg.Size = UDim2.fromOffset(3, h);
+						hbBg.Visible = true;
+						hbFill.Position = UDim2.fromOffset(left - 5, top + h * (1 - pct));
+						hbFill.Size = UDim2.fromOffset(3, math.max(1, h * pct));
+						hbFill.BackgroundColor3 = hbC;
+						hbFill.Visible = true;
+					else
+						hbBg.Visible = false;
+						hbFill.Visible = false;
+					end;
+					if data.showName ~= false then
+						nameL.Position = UDim2.fromOffset(cx, top - 2);
+						nameL.Text = tostring(data.name or "");
+						nameL.Visible = true;
+					else
+						nameL.Visible = false;
+					end;
+					local sub = tostring(data.sub or "");
+					if data.showSub ~= false and sub ~= "" then
+						subL.Position = UDim2.fromOffset(cx, top + h + 2);
+						subL.Text = sub;
+						subL.Visible = true;
+					else
+						subL.Visible = false;
+					end;
+					if data.showTracer ~= false then
+						setTracer(Vector2.new(vs.X / 2, vs.Y), Vector2.new(cx, top + h), boxColor);
+					else
+						tracer.Visible = false;
+					end;
+				end);
+			end;
+		end);
+
+		local OpcToggle = function(value)
+			pcall(function()
+				Box.Visible = value;
+			end);
+		end;
+
+		OpcToggle(Event:GetAttribute('V'));
+
+		local Respons = Fatality:CreateResponse({
+			Rename = function(new_name)
+				Title.Text = new_name;
+				Fatality:ProtectText(Title,new_name);
+			end,
+			Refresh = function()
+				wantRefresh = true;
+			end,
+			GetValue = function()
+				return {};
+			end,
+			Signal = Event.Event:Connect(OpcToggle),
+			Flag = Config.Flag and Config.Flag.."Preview",
+			Frame = Box,
+			Destroy = function()
+				pcall(function()
+					Box:Destroy();
+				end);
+			end,
+		});
+
+		if Config.Flag then
+			Fatality.WindowFlags[FatalWindow][Config.Flag.."Preview"] = Respons;
 		end;
 
 		return Respons;
