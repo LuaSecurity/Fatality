@@ -3421,7 +3421,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		Box.BackgroundTransparency = 0.300
 		Box.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		Box.BorderSizePixel = 0
-		Box.Size = UDim2.new(1, -25, 0, Config.Height)
+		Box.Size = UDim2.new(1, -12, 0, Config.Height)
 		Box.ZIndex = ZIndex + 1
 		Box.ClipsDescendants = true
 		Fatality:AddDragBlacklist(Box);
@@ -3447,8 +3447,8 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		View.Parent = Box
 		View.BackgroundTransparency = 1.000
 		View.BorderSizePixel = 0
-		View.Position = UDim2.new(0, 6, 0, 20)
-		View.Size = UDim2.new(1, -12, 1, -26)
+		View.Position = UDim2.new(0, 4, 0, 20)
+		View.Size = UDim2.new(1, -8, 1, -26)
 		View.ZIndex = ZIndex + 2
 
 		local World = Instance.new("WorldModel")
@@ -3470,6 +3470,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 
 		local vCam = Instance.new("Camera")
 		vCam.FieldOfView = 60
+		vCam.CFrame = CFrame.new(Vector3.new(0, 2.5, 10.5), Vector3.new(0, 0, 0))
 		pcall(function()
 			vCam.Parent = View
 		end)
@@ -3529,7 +3530,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					hrp.CFrame = CFrame.new(0, 0, 0) * CFrame.Angles(0, math.pi, 0)
 				end);
 				pcall(function()
-					vCam.CFrame = CFrame.new(Vector3.new(0, 2, 8), hrp.Position)
+					vCam.CFrame = CFrame.new(Vector3.new(0, 2.5, 10.5), hrp.Position)
 				end);
 				Placeholder.Visible = false;
 			else
@@ -4166,12 +4167,12 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					local theta = tick() * 0.9;
 					lastTheta = theta;
 					pcall(function()
-						vCam.CFrame = CFrame.new(hrp.Position + Vector3.new(math.sin(theta) * 8, 2, math.cos(theta) * 8), hrp.Position);
+						vCam.CFrame = CFrame.new(hrp.Position + Vector3.new(math.sin(theta) * 10.5, 2.5, math.cos(theta) * 10.5), hrp.Position);
 					end);
 				else
 					lastTheta = 0;
 					pcall(function()
-						vCam.CFrame = CFrame.new(Vector3.new(0, 2, 8), hrp.Position);
+						vCam.CFrame = CFrame.new(Vector3.new(0, 2.5, 10.5), hrp.Position);
 					end);
 				end;
 				drawOverlay(hrp);
