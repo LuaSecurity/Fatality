@@ -3482,6 +3482,14 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		local rotConn = nil;
 		local previewData = {};
 		local lastTheta = 0;
+		-- Perf: clone hierarchy never changes after cloning, so scan it once
+		-- (instead of GetDescendants() every frame). Bone refs + label text
+		-- are cached the same way; frameSize avoids an AbsoluteSize read per
+		-- projected corner.
+		local cloneParts = nil;
+		local cloneBones = {};
+		local frameSize = Vector2.new(0, 0);
+		local lastTxt = setmetatable({}, { __mode = "k" });
 
 		local function updateViewport(char)
 			if not char then
@@ -3491,6 +3499,8 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					end)
 				end;
 				characterClone = nil;
+				cloneParts = nil;
+				cloneBones = {};
 				Placeholder.Visible = true;
 				return;
 			end;
@@ -3500,6 +3510,8 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 				end)
 				characterClone = nil;
 			end;
+			cloneParts = nil;
+			cloneBones = {};
 			pcall(function()
 				char:WaitForChild("HumanoidRootPart", 5)
 			end);
@@ -3524,6 +3536,22 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 				return;
 			end;
 			characterClone = clone;
+			-- One-time hierarchy scan: box projection + skeleton reuse this.
+			pcall(function()
+				local acc = {};
+				for _, d in ipairs(clone:GetDescendants()) do
+					local okP = false;
+					pcall(function() okP = d:IsA("BasePart") end);
+					if okP then
+						local inAcc = false;
+						pcall(function() inAcc = d:FindFirstAncestorOfClass("Accessory") ~= nil end);
+						if not inAcc then
+							table.insert(acc, d);
+						end;
+					end;
+				end;
+				cloneParts = acc;
+			end);
 			local hrp = characterClone:FindFirstChild("HumanoidRootPart")
 			if hrp then
 				pcall(function()
@@ -3699,7 +3727,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 
 		-- === ESP-PREVIEW-SYNC: ViewportFrame has no engine projection for its
 		-- camera, so project clone parts manually (vCam CFrame + FOV against
-		-- View.AbsoluteSize). Returns nil when behind the camera.
+		-- the cached per-frame viewport size). Returns nil when behind camera.
 		local function projectToView(worldPos)
 			local ok, rel = pcall(function()
 				return vCam.CFrame:PointToObjectSpace(worldPos)
@@ -3707,13 +3735,12 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			if not ok or not rel or rel.Z >= -0.01 then
 				return nil;
 			end;
-			local pvs = View.AbsoluteSize;
-			if pvs.Y < 1 then
+			if frameSize.Y < 1 then
 				return nil;
 			end;
-			local f = (pvs.Y / 2) / math.tan(math.rad(vCam.FieldOfView) / 2);
+			local f = (frameSize.Y / 2) / math.tan(math.rad(vCam.FieldOfView) / 2);
 			local inv = 1 / -rel.Z;
-			return Vector2.new(pvs.X / 2 + rel.X * inv * f, pvs.Y / 2 - rel.Y * inv * f);
+			return Vector2.new(frameSize.X / 2 + rel.X * inv * f, frameSize.Y / 2 - rel.Y * inv * f);
 		end;
 
 		local function setLine(f, ax, ay, bx, by, thick, color)
@@ -3731,6 +3758,48 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			f.Visible = true;
 		end;
 
+		local function getBone(idx, name)
+			local rec = cloneBones[idx];
+			if rec and rec.clone == characterClone then
+				local rp = rec.part;
+				local okR = false;
+				pcall(function() okR = rp ~= nil and rp.Parent ~= nil end);
+				if okR then
+					return rp;
+				end;
+			end;
+			local p = nil;
+			pcall(function()
+				if characterClone then
+					p = characterClone:FindFirstChild(name);
+				end;
+			end);
+			local okP = false;
+			pcall(function() okP = p ~= nil and p:IsA("BasePart") end);
+			if okP then
+				cloneBones[idx] = { clone = characterClone, part = p };
+				return p;
+			end;
+			cloneBones[idx] = nil;
+			return nil;
+		end;
+
+		local function setTxt(l, txt, col)
+			local k = lastTxt[l];
+			if k == nil then
+				k = {};
+				lastTxt[l] = k;
+			end;
+			if k.t ~= txt then
+				l.Text = txt;
+				k.t = txt;
+			end;
+			if col ~= nil and k.c ~= col then
+				l.TextColor3 = col;
+				k.c = col;
+			end;
+		end;
+
 		local function drawOverlay(hrp)
 			local data = previewData or {};
 			if data.showESP == false then
@@ -3742,6 +3811,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 				hideOverlay();
 				return;
 			end;
+			frameSize = vs;
 			-- === ESP-PREVIEW-SYNC: box bounds mirror live H.ESP.GetBodyBounds
 			-- exactly. Every non-accessory BasePart corner is projected through
 			-- projectToView (the ViewportFrame equivalent of
@@ -3749,56 +3819,43 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			-- live runs (pad 2, min 4px, clamp to viewport). No fake width: as
 			-- the clone rotates the box breathes exactly like the in-game box.
 			local x0, y0, x1, y1 = nil, nil, nil, nil;
-			if characterClone and characterClone.Parent then
-				local descs = nil;
+			-- Cached part list (built once in updateViewport): same parts a
+			-- live scan would yield, without the per-frame hierarchy walk.
+			local parts = cloneParts;
+			if type(parts) ~= "table" or #parts == 0 then
+				hideOverlay();
+				return;
+			end;
+			for i = 1, #parts do
+				local d = parts[i];
+				local cf, hx, hy, hz = nil, nil, nil, nil;
 				pcall(function()
-					descs = characterClone:GetDescendants();
+					cf = d.CFrame;
+					local s = d.Size;
+					hx, hy, hz = s.X * 0.5, s.Y * 0.5, s.Z * 0.5;
 				end);
-				if type(descs) == "table" then
-					for i = 1, #descs do
-						local d = descs[i];
-						local isPart = false;
-						pcall(function()
-							isPart = d:IsA("BasePart");
-						end);
-						if isPart then
-							local inAcc = false;
-							pcall(function()
-								inAcc = d:FindFirstAncestorOfClass("Accessory") ~= nil;
-							end);
-							if not inAcc then
-								local cf, sz = nil, nil;
+				if cf and hx then
+					for ax = -1, 1, 2 do
+						for ay = -1, 1, 2 do
+							for az = -1, 1, 2 do
+								local wp = nil;
 								pcall(function()
-									cf = d.CFrame;
-									sz = d.Size;
+									wp = cf * Vector3.new(hx * ax, hy * ay, hz * az);
 								end);
-								if cf and sz then
-									local hx, hy, hz = sz.X * 0.5, sz.Y * 0.5, sz.Z * 0.5;
-									for ax = -1, 1, 2 do
-										for ay = -1, 1, 2 do
-											for az = -1, 1, 2 do
-												local wp = nil;
-												pcall(function()
-													wp = cf * Vector3.new(hx * ax, hy * ay, hz * az);
-												end);
-												if wp then
-													local sp = projectToView(wp);
-													if sp then
-														if x0 == nil or sp.X < x0 then
-															x0 = sp.X;
-														end;
-														if x1 == nil or sp.X > x1 then
-															x1 = sp.X;
-														end;
-														if y0 == nil or sp.Y < y0 then
-															y0 = sp.Y;
-														end;
-														if y1 == nil or sp.Y > y1 then
-															y1 = sp.Y;
-														end;
-													end;
-												end;
-											end;
+								if wp then
+									local sp = projectToView(wp);
+									if sp then
+										if x0 == nil or sp.X < x0 then
+											x0 = sp.X;
+										end;
+										if x1 == nil or sp.X > x1 then
+											x1 = sp.X;
+										end;
+										if y0 == nil or sp.Y < y0 then
+											y0 = sp.Y;
+										end;
+										if y1 == nil or sp.Y > y1 then
+											y1 = sp.Y;
 										end;
 									end;
 								end;
@@ -3943,24 +4000,20 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			local showS = data.showSub ~= false;
 			if showN and showS then
 				nameL.Position = UDim2.fromOffset(cx, top - 15);
-				nameL.Text = tostring(data.name or "");
-				nameL.TextColor3 = colOf(data.nameColor, Color3.fromRGB(255, 255, 255));
+				setTxt(nameL, tostring(data.name or ""), colOf(data.nameColor, Color3.fromRGB(255, 255, 255)));
 				nameL.Visible = true;
 				subL.Position = UDim2.fromOffset(cx, top - 2);
-				subL.Text = tostring(data.sub or "");
-				subL.TextColor3 = colOf(data.subColor, Color3.fromRGB(200, 200, 200));
+				setTxt(subL, tostring(data.sub or ""), colOf(data.subColor, Color3.fromRGB(200, 200, 200)));
 				subL.Visible = true;
 			elseif showN then
 				nameL.Position = UDim2.fromOffset(cx, top - 2);
-				nameL.Text = tostring(data.name or "");
-				nameL.TextColor3 = colOf(data.nameColor, Color3.fromRGB(255, 255, 255));
+				setTxt(nameL, tostring(data.name or ""), colOf(data.nameColor, Color3.fromRGB(255, 255, 255)));
 				nameL.Visible = true;
 				subL.Visible = false;
 			elseif showS then
 				nameL.Visible = false;
 				subL.Position = UDim2.fromOffset(cx, top - 2);
-				subL.Text = tostring(data.sub or "");
-				subL.TextColor3 = colOf(data.subColor, Color3.fromRGB(200, 200, 200));
+				setTxt(subL, tostring(data.sub or ""), colOf(data.subColor, Color3.fromRGB(200, 200, 200)));
 				subL.Visible = true;
 			else
 				nameL.Visible = false;
@@ -3969,8 +4022,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			local by = top + h + 2;
 			if data.showItem then
 				itemL.Position = UDim2.fromOffset(cx, by);
-				itemL.Text = tostring(data.itemText or "");
-				itemL.TextColor3 = colOf(data.itemColor, Color3.fromRGB(255, 255, 255));
+				setTxt(itemL, tostring(data.itemText or ""), colOf(data.itemColor, Color3.fromRGB(255, 255, 255)));
 				itemL.Visible = true;
 				by = by + 13;
 			else
@@ -4032,8 +4084,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					local entry = visible[i];
 					if type(entry) == "table" and entry.text then
 						fl.Position = UDim2.fromOffset(left + w + 5, top + (i - 1) * 13);
-						fl.Text = tostring(entry.text);
-						fl.TextColor3 = colOf(entry.color, Color3.fromRGB(255, 255, 255));
+						setTxt(fl, tostring(entry.text), colOf(entry.color, Color3.fromRGB(255, 255, 255)));
 						fl.Visible = true;
 					else
 						fl.Visible = false;
@@ -4057,9 +4108,9 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 				end;
 				for i, bone in ipairs(SKEL_BONES) do
 					local f = skelLines[i];
-					local a = characterClone:FindFirstChild(bone[1]);
-					local b = characterClone:FindFirstChild(bone[2]);
-					if a and b and a:IsA("BasePart") and b:IsA("BasePart") then
+					local a = getBone(i .. "a", bone[1]);
+					local b = getBone(i .. "b", bone[2]);
+					if a and b then
 						local pa = projectToView(a.Position);
 						local pb = projectToView(b.Position);
 						if pa and pb then
@@ -4100,16 +4151,14 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					rot = 0;
 				end;
 				arrowL.Position = UDim2.fromOffset(ax, ay);
-				arrowL.Text = tostring(data.arrowGlyph or "▲");
-				arrowL.TextColor3 = colOf(data.arrowColor, Color3.fromRGB(255, 60, 80));
+				setTxt(arrowL, tostring(data.arrowGlyph or "▲"), colOf(data.arrowColor, Color3.fromRGB(255, 60, 80)));
 				arrowL.TextSize = tonumber(data.arrowSize) or 28;
 				arrowL.Size = UDim2.new(0, arrowL.TextSize + 32, 0, arrowL.TextSize + 32);
 				arrowL.Rotation = rot;
 				arrowL.Visible = true;
 				if data.arrowShowDistance ~= false then
 					arrowDistL.Position = UDim2.fromOffset(ax, ay + 22);
-					arrowDistL.Text = "87m";
-					arrowDistL.TextColor3 = colOf(data.arrowColor, Color3.fromRGB(255, 60, 80));
+					setTxt(arrowDistL, "87m", colOf(data.arrowColor, Color3.fromRGB(255, 60, 80)));
 					arrowDistL.Visible = true;
 				else
 					arrowDistL.Visible = false;
