@@ -3482,6 +3482,9 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		local rotConn = nil;
 		local previewData = {};
 		local lastTheta = 0;
+		-- Draw at 30Hz (camera orbit stays 60Hz): halves the ~400 projection
+		-- allocs per frame in this menu widget, invisible at 0.9 rad/s.
+		local drawAlt = false;
 		-- Perf: clone hierarchy never changes after cloning, so scan it once
 		-- (instead of GetDescendants() every frame). Bone refs + label text
 		-- are cached the same way; frameSize avoids an AbsoluteSize read per
@@ -4224,7 +4227,10 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 						vCam.CFrame = CFrame.new(Vector3.new(0, 2.5, 10.5), hrp.Position);
 					end);
 				end;
-				drawOverlay(hrp);
+				drawAlt = not drawAlt;
+				if drawAlt then
+					drawOverlay(hrp);
+				end;
 			end);
 		end);
 
