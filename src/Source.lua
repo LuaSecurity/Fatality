@@ -3478,6 +3478,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		local charAddedConn = nil;
 		local wantRotate = true;
 		local rotConn = nil;
+		local previewData = {};
 
 		local function updateViewport(char)
 			if not char then
@@ -3534,6 +3535,271 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			end;
 		end;
 
+		local function mkEdge()
+			local f = Instance.new("Frame")
+			f.BorderSizePixel = 0
+			f.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			f.Visible = false
+			f.ZIndex = ZIndex + 4
+			f.Parent = View
+			return f
+		end;
+
+		local edgeT, edgeB, edgeL, edgeR = mkEdge(), mkEdge(), mkEdge(), mkEdge();
+		local hbBg, hbFill = mkEdge(), mkEdge();
+		hbBg.BackgroundColor3 = Color3.fromRGB(20, 20, 20);
+
+		local function mkTopLabel(h)
+			local l = Instance.new("TextLabel")
+			l.BackgroundTransparency = 1.000
+			l.AnchorPoint = Vector2.new(0.5, 1)
+			l.Size = UDim2.new(1, -10, 0, h)
+			l.ZIndex = ZIndex + 4
+			l.FontFace = Fatality.FontSemiBold
+			l.TextColor3 = Color3.fromRGB(255, 255, 255)
+			l.TextSize = 13.000
+			l.TextStrokeTransparency = 0.500
+			l.Visible = false
+			l.Parent = View
+			return l
+		end;
+
+		local function mkBottomLabel(h)
+			local l = Instance.new("TextLabel")
+			l.BackgroundTransparency = 1.000
+			l.AnchorPoint = Vector2.new(0.5, 0)
+			l.Size = UDim2.new(1, -10, 0, h)
+			l.ZIndex = ZIndex + 4
+			l.FontFace = Fatality.FontSemiBold
+			l.TextColor3 = Color3.fromRGB(255, 255, 255)
+			l.TextSize = 12.000
+			l.TextStrokeTransparency = 0.500
+			l.Visible = false
+			l.Parent = View
+			return l
+		end;
+
+		local nameL, subL = mkTopLabel(14), mkTopLabel(13);
+		local itemL, ammoL = mkBottomLabel(13), mkBottomLabel(13);
+
+		local infoL = Instance.new("TextLabel")
+		infoL.BackgroundTransparency = 1.000
+		infoL.AnchorPoint = Vector2.new(0, 0)
+		infoL.Size = UDim2.new(0, 150, 0, 120)
+		infoL.ZIndex = ZIndex + 4
+		infoL.FontFace = Fatality.FontSemiBold
+		infoL.TextColor3 = Color3.fromRGB(255, 255, 255)
+		infoL.TextSize = 12.000
+		infoL.TextStrokeTransparency = 0.500
+		infoL.TextXAlignment = Enum.TextXAlignment.Left
+		infoL.TextYAlignment = Enum.TextYAlignment.Top
+		infoL.RichText = true
+		infoL.Visible = false
+		infoL.Parent = View
+
+		local function hideOverlay()
+			edgeT.Visible = false;
+			edgeB.Visible = false;
+			edgeL.Visible = false;
+			edgeR.Visible = false;
+			hbBg.Visible = false;
+			hbFill.Visible = false;
+			nameL.Visible = false;
+			subL.Visible = false;
+			itemL.Visible = false;
+			ammoL.Visible = false;
+			infoL.Visible = false;
+		end;
+
+		local function colOf(v, fallback)
+			if typeof(v) == "Color3" then
+				return v;
+			end;
+			return fallback;
+		end;
+
+		local function drawOverlay(hrp)
+			local head = characterClone and characterClone:FindFirstChild("Head");
+			if not head then
+				hideOverlay();
+				return;
+			end;
+			local vs = View.AbsoluteSize;
+			if vs.X < 10 or vs.Y < 10 then
+				hideOverlay();
+				return;
+			end;
+			pcall(function()
+				vCam.ViewportSize = vs;
+			end);
+			local pTop, pFeet = nil, nil;
+			pcall(function()
+				local sp, vis = vCam:WorldToViewportPoint(head.Position + Vector3.new(0, 0.6, 0));
+				if vis then
+					pTop = Vector2.new(sp.X, sp.Y);
+				end;
+			end);
+			pcall(function()
+				local sp, vis = vCam:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3.2, 0));
+				if vis then
+					pFeet = Vector2.new(sp.X, sp.Y);
+				end;
+			end);
+			if not pTop or not pFeet then
+				hideOverlay();
+				return;
+			end;
+			local h = math.abs(pFeet.Y - pTop.Y);
+			if h < 4 then
+				h = 4;
+			end;
+			local w = h / 2;
+			local cx = pFeet.X;
+			local left = cx - w / 2;
+			local top = math.min(pTop.Y, pFeet.Y);
+			local data = previewData or {};
+			if data.showBox ~= false then
+				local cT, cB, cM;
+				if data.boxStyle == "Gradient" then
+					cT = colOf(data.boxTop, Color3.fromRGB(255, 60, 80));
+					cB = colOf(data.boxBottom, Color3.fromRGB(255, 60, 80));
+				else
+					cT = colOf(data.boxColor, Color3.fromRGB(255, 60, 80));
+					cB = cT;
+				end;
+				cM = cT:Lerp(cB, 0.5);
+				edgeT.Position = UDim2.fromOffset(left, top);
+				edgeT.Size = UDim2.fromOffset(w, 1);
+				edgeT.BackgroundColor3 = cT;
+				edgeT.Visible = true;
+				edgeB.Position = UDim2.fromOffset(left, top + h);
+				edgeB.Size = UDim2.fromOffset(w, 1);
+				edgeB.BackgroundColor3 = cB;
+				edgeB.Visible = true;
+				edgeL.Position = UDim2.fromOffset(left, top);
+				edgeL.Size = UDim2.fromOffset(1, h);
+				edgeL.BackgroundColor3 = cM;
+				edgeL.Visible = true;
+				edgeR.Position = UDim2.fromOffset(left + w, top);
+				edgeR.Size = UDim2.fromOffset(1, h);
+				edgeR.BackgroundColor3 = cM;
+				edgeR.Visible = true;
+			else
+				edgeT.Visible = false;
+				edgeB.Visible = false;
+				edgeL.Visible = false;
+				edgeR.Visible = false;
+			end;
+			local pct = tonumber(data.healthPct);
+			if pct == nil then
+				pct = 1;
+			end;
+			if pct < 0 then
+				pct = 0;
+			end;
+			if pct > 1 then
+				pct = 1;
+			end;
+			if data.showHealth ~= false then
+				local hFull = colOf(data.healthFull, Color3.fromRGB(0, 255, 0));
+				local hEmpty = colOf(data.healthEmpty, Color3.fromRGB(255, 0, 0));
+				local hCol;
+				if data.healthStyle == "Gradient" then
+					hCol = hEmpty:Lerp(hFull, pct);
+				else
+					hCol = colOf(data.healthColor, hEmpty:Lerp(hFull, pct));
+				end;
+				hbBg.Position = UDim2.fromOffset(left - 5, top);
+				hbBg.Size = UDim2.fromOffset(3, h);
+				hbBg.Visible = true;
+				hbFill.Position = UDim2.fromOffset(left - 5, top + h * (1 - pct));
+				hbFill.Size = UDim2.fromOffset(3, math.max(1, h * pct));
+				hbFill.BackgroundColor3 = hCol;
+				hbFill.Visible = true;
+			else
+				hbBg.Visible = false;
+				hbFill.Visible = false;
+			end;
+			local showN = data.showName ~= false;
+			local showS = data.showSub ~= false;
+			if showN and showS then
+				nameL.Position = UDim2.fromOffset(cx, top - 15);
+				nameL.Text = tostring(data.name or "");
+				nameL.TextColor3 = colOf(data.nameColor, Color3.fromRGB(255, 255, 255));
+				nameL.Visible = true;
+				subL.Position = UDim2.fromOffset(cx, top - 2);
+				subL.Text = tostring(data.sub or "");
+				subL.TextColor3 = colOf(data.subColor, Color3.fromRGB(200, 200, 200));
+				subL.Visible = true;
+			elseif showN then
+				nameL.Position = UDim2.fromOffset(cx, top - 2);
+				nameL.Text = tostring(data.name or "");
+				nameL.TextColor3 = colOf(data.nameColor, Color3.fromRGB(255, 255, 255));
+				nameL.Visible = true;
+				subL.Visible = false;
+			elseif showS then
+				nameL.Visible = false;
+				subL.Position = UDim2.fromOffset(cx, top - 2);
+				subL.Text = tostring(data.sub or "");
+				subL.TextColor3 = colOf(data.subColor, Color3.fromRGB(200, 200, 200));
+				subL.Visible = true;
+			else
+				nameL.Visible = false;
+				subL.Visible = false;
+			end;
+			local by = top + h + 2;
+			if data.showItem then
+				itemL.Position = UDim2.fromOffset(cx, by);
+				itemL.Text = tostring(data.itemText or "");
+				itemL.TextColor3 = colOf(data.itemColor, Color3.fromRGB(255, 255, 255));
+				itemL.Visible = true;
+				by = by + 13;
+			else
+				itemL.Visible = false;
+			end;
+			if data.showAmmo and tostring(data.ammoText or "") ~= "" then
+				local aPct = tonumber(data.ammoPct);
+				if aPct == nil then
+					aPct = 1;
+				end;
+				local aCol;
+				if data.ammoStyle == "Gradient" then
+					local aFull = colOf(data.ammoFull, Color3.fromRGB(0, 255, 0));
+					local aEmpty = colOf(data.ammoEmpty, Color3.fromRGB(255, 0, 0));
+					aCol = aEmpty:Lerp(aFull, math.clamp(aPct, 0, 1));
+				else
+					aCol = colOf(data.ammoColor, Color3.fromRGB(255, 255, 255));
+				end;
+				ammoL.Position = UDim2.fromOffset(cx, by);
+				ammoL.Text = tostring(data.ammoText or "");
+				ammoL.TextColor3 = aCol;
+				ammoL.Visible = true;
+			else
+				ammoL.Visible = false;
+			end;
+			if data.showInfo ~= false and type(data.info) == "table" and #data.info > 0 then
+				local lines = {};
+				for _, entry in ipairs(data.info) do
+					if type(entry) == "table" and entry.text then
+						local c = colOf(entry.color, Color3.fromRGB(255, 255, 255));
+						local r = math.floor(c.R * 255 + 0.5);
+						local g = math.floor(c.G * 255 + 0.5);
+						local b = math.floor(c.B * 255 + 0.5);
+						table.insert(lines, string.format('<font color="rgb(%d,%d,%d)">%s</font>', r, g, b, tostring(entry.text)));
+					end;
+				end;
+				if #lines > 0 then
+					infoL.Position = UDim2.fromOffset(left + w + 4, top);
+					infoL.Text = table.concat(lines, "\n");
+					infoL.Visible = true;
+				else
+					infoL.Visible = false;
+				end;
+			else
+				infoL.Visible = false;
+			end;
+		end;
+
 		pcall(function()
 			local player = Players.LocalPlayer;
 			if player then
@@ -3558,6 +3824,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					else
 						wantRotate = data.rotate ~= false;
 					end;
+					previewData = data;
 				end);
 			end;
 		end);
@@ -3568,10 +3835,12 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					return;
 				end;
 				if not characterClone or not characterClone.Parent then
+					hideOverlay();
 					return;
 				end;
 				local hrp = characterClone:FindFirstChild("HumanoidRootPart");
 				if not hrp then
+					hideOverlay();
 					return;
 				end;
 				if wantRotate then
@@ -3584,6 +3853,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 						vCam.CFrame = CFrame.new(Vector3.new(0, 2, 5), hrp.Position);
 					end);
 				end;
+				drawOverlay(hrp);
 			end);
 		end);
 
