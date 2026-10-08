@@ -3577,9 +3577,6 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					hrp.CFrame = CFrame.new(0, 0, 0)
 				end
 			end);
-			pcall(function()
-				clone:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, math.pi, 0));
-			end);
 			model = clone;
 			clonedFrom = okChar;
 			return true;
@@ -3659,17 +3656,11 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					end;
 					vCam.ViewportSize = vs;
 					vCam.FieldOfView = 55;
-					vCam.CFrame = CFrame.new(Vector3.new(0, 2, 5), root.Position);
+					local theta = math.pi;
 					if data.rotate ~= false then
-						pcall(function()
-							local piv = model:GetPivot()
-							model:PivotTo((piv - piv.Position) * CFrame.Angles(0, 0.05, 0) + piv.Position)
-						end);
-					else
-						pcall(function()
-							model:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, math.pi, 0));
-						end);
+						theta = math.pi + tick() * 0.35 % 6.283185307179586;
 					end;
+					vCam.CFrame = CFrame.new(root.Position + Vector3.new(math.sin(theta) * 5, 2, math.cos(theta) * 5), root.Position);
 					local pTop = project(head.Position + Vector3.new(0, 0.6, 0));
 					local pFeet = project(root.Position - Vector3.new(0, 3.2, 0));
 					if not pTop or not pFeet then
