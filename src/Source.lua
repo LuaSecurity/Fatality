@@ -3577,6 +3577,9 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					hrp.CFrame = CFrame.new(0, 0, 0)
 				end
 			end);
+			pcall(function()
+				clone:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, math.pi, 0));
+			end);
 			model = clone;
 			clonedFrom = okChar;
 			return true;
@@ -3656,11 +3659,15 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					end;
 					vCam.ViewportSize = vs;
 					vCam.FieldOfView = 55;
-					vCam.CFrame = CFrame.new(Vector3.new(0, 2, 5), Vector3.new(0, 0, 0));
+					vCam.CFrame = CFrame.new(Vector3.new(0, 0.8, 5.8), Vector3.new(0, 0, 0));
 					if data.rotate ~= false then
 						pcall(function()
 							local piv = model:GetPivot()
 							model:PivotTo((piv - piv.Position) * CFrame.Angles(0, 0.05, 0) + piv.Position)
+						end);
+					else
+						pcall(function()
+							model:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, math.pi, 0));
 						end);
 					end;
 					local pTop = project(head.Position + Vector3.new(0, 0.6, 0));
