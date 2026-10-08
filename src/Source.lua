@@ -3526,7 +3526,6 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		local clonedFrom = nil;
 		local model = nil;
 		local wantRefresh = false;
-		local fitDist = 7;
 
 		local function clearModel()
 			if model then
@@ -3636,18 +3635,33 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					pcall(function()
 						data = Config.Provider() or {};
 					end);
-					if data.rotate == false then
+					if data.rotate ~= false then
 						pcall(function()
-							model:PivotTo(CFrame.new(0, 0, 0));
-						end);
-					else
-						pcall(function()
-							model:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, tick() * 0.35 % 6.283185307179586, 0));
+							local piv = model:GetPivot()
+							model:PivotTo((piv - piv.Position) * CFrame.Angles(0, 0.05, 0) + piv.Position)
 						end);
 					end;
+					local lookC = nil;
+					local lookR = 2.5;
+					pcall(function()
+						local bb, sz = model:GetBoundingBox()
+						lookC = bb.Position
+						lookR = math.max(sz.X, sz.Y, sz.Z) * 0.5
+						if lookR < 0.5 then
+							lookR = 2.5
+						end
+					end);
 					vCam.ViewportSize = vs;
 					vCam.FieldOfView = 55;
-					vCam.CFrame = CFrame.new(Vector3.new(0, -0.4 + fitDist * 0.12, fitDist), Vector3.new(0, -0.5, 0));
+					local theta = 0;
+					if data.rotate ~= false then
+						theta = tick() * 0.35 % 6.283185307179586;
+					end;
+					local orbD = math.max(lookR * 2.4, 2);
+					local orbE = 0.12;
+					local orbC = math.cos(orbE);
+					local orbP = lookC or Vector3.new(0, 0, 0);
+					vCam.CFrame = CFrame.new(orbP + Vector3.new(math.cos(theta) * orbD * orbC, math.sin(orbE) * orbD, math.sin(theta) * orbD * orbC), orbP);
 					local root = model:FindFirstChild("HumanoidRootPart");
 					local head = model:FindFirstChild("Head");
 					if not root or not head then
@@ -3664,18 +3678,6 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					if h < 4 then
 						h = 4;
 					end;
-					pcall(function()
-						local want = vs.Y * 0.62;
-						if h > 8 and want > 8 then
-							fitDist = fitDist * (want / h);
-							if fitDist < 3 then
-								fitDist = 3;
-							end;
-							if fitDist > 18 then
-								fitDist = 18;
-							end;
-						end;
-					end);
 					local w = h / 2;
 					local cx = pFeet.X;
 					local left = cx - w / 2;
