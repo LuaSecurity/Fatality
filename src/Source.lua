@@ -3659,7 +3659,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					end;
 					vCam.ViewportSize = vs;
 					vCam.FieldOfView = 55;
-					vCam.CFrame = CFrame.new(Vector3.new(0, 0.8, 5.8), Vector3.new(0, 0, 0));
+					vCam.CFrame = CFrame.new(Vector3.new(0, 2, 5), root.Position);
 					if data.rotate ~= false then
 						pcall(function()
 							local piv = model:GetPivot()
