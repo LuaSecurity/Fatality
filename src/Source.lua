@@ -5753,7 +5753,7 @@ function Fatality.new(Window: Window)
 		UIListLayout.Parent = Left
 		UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-		UIListLayout.Padding = UDim.new(0, 2)
+		UIListLayout.Padding = UDim.new(0, 6)
 		UIListLayout.VerticalFlex = (Menu.AutoFill and Enum.UIFlexAlignment.Fill) or Enum.UIFlexAlignment.None;
 
 		Center.Name = Fatality:RandomString()
@@ -5772,7 +5772,7 @@ function Fatality.new(Window: Window)
 		UIListLayout_2.Parent = Center
 		UIListLayout_2.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		UIListLayout_2.SortOrder = Enum.SortOrder.LayoutOrder
-		UIListLayout_2.Padding = UDim.new(0, 2)
+		UIListLayout_2.Padding = UDim.new(0, 6)
 		UIListLayout_2.VerticalFlex = (Menu.AutoFill and Enum.UIFlexAlignment.Fill) or Enum.UIFlexAlignment.None;
 
 		Right.Name = Fatality:RandomString()
@@ -5791,7 +5791,7 @@ function Fatality.new(Window: Window)
 		UIListLayout_3.Parent = Right
 		UIListLayout_3.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		UIListLayout_3.SortOrder = Enum.SortOrder.LayoutOrder
-		UIListLayout_3.Padding = UDim.new(0, 2)
+		UIListLayout_3.Padding = UDim.new(0, 6)
 		UIListLayout_3.VerticalFlex = (Menu.AutoFill and Enum.UIFlexAlignment.Fill) or Enum.UIFlexAlignment.None;
 
 		local BindEvent = Instance.new('BindableEvent',MenuLiber);
@@ -5807,6 +5807,48 @@ function Fatality.new(Window: Window)
 			Center.CanvasSize = UDim2.new(0,0,0,0);
 		end;
 
+		-- Column behaviour: vertical-only scrolling keeps tall stacks inside
+		-- the window instead of spilling horizontally.
+		for _, col in ipairs({ Left, Center, Right }) do
+			pcall(function()
+				col.ScrollingDirection = Enum.ScrollingDirection.Y;
+				col.ElasticBehavior = Enum.ElasticBehavior.Never;
+				col.ScrollBarThickness = 0;
+			end);
+		end;
+
+		-- Section stacking state. `sectionOrder` gives every section /
+		-- preview / listbox an explicit LayoutOrder so creation order survives
+		-- tab reparenting (reparenting appends to the end, which would
+		-- otherwise scramble the stack). `TabHidden` is a detached holder:
+		-- hidden tab sections are REPARENTED there instead of only
+		-- Visible=false, because UIListLayout still reserves space for
+		-- invisible frames on several client versions — that reserved space
+		-- is the random BIG gap between sections.
+		local sectionOrder = 0;
+		local TabHidden = Instance.new("Folder");
+		TabHidden.Name = Fatality:RandomString();
+		TabHidden.Parent = MenuLiber;
+		local frameColumn = {};
+		local tabsActive = false;
+
+		-- Column geometry. No-tab layout is the original centered trio.
+		-- Tabbed layout shifts the trio right to clear the side strip, makes
+		-- each column wider (1/3 - 42 instead of 1/3 - 47.33) and pulls the
+		-- left column closer to the strip (6px gap instead of 12px).
+		-- Right margin is 6px so nothing spills out of the window.
+		local NO_TAB_GEOM = {
+			LeftPos = UDim2.new(0.175, 0, 0.5, 0),
+			CenterPos = UDim2.new(0.5, 0, 0.5, 0),
+			RightPos = UDim2.new(0.825, 0, 0.5, 0),
+		};
+		local TAB_GEOM = {
+			LeftPos = UDim2.new(0, 110, 0.5, 0),
+			CenterPos = UDim2.new(1 / 3, 73, 0.5, 0),
+			RightPos = UDim2.new(2 / 3, 36, 0.5, 0),
+			Size = UDim2.new(1 / 3, -42, 1, -5),
+		};
+
 		Fatal.Signal.Event:Connect(function(Bool)
 			if Bool then
 				Fatality:CreateAnimation(MenuButton,0.5,{
@@ -5818,15 +5860,15 @@ function Fatality.new(Window: Window)
 				})
 
 				Fatality:CreateAnimation(Left,0.3,{
-					Position = UDim2.new(0.175, 0, 0.5, 0)
+					Position = (tabsActive and TAB_GEOM.LeftPos) or NO_TAB_GEOM.LeftPos
 				})
 
 				Fatality:CreateAnimation(Center,0.4,{
-					Position = UDim2.new(0.5, 0, 0.5, 0)
+					Position = (tabsActive and TAB_GEOM.CenterPos) or NO_TAB_GEOM.CenterPos
 				})
 
 				Fatality:CreateAnimation(Right,0.5,{
-					Position = UDim2.new(0.825, 0, 0.5, 0)
+					Position = (tabsActive and TAB_GEOM.RightPos) or NO_TAB_GEOM.RightPos
 				})
 
 				Fatality:CreateAnimation(Icon,0.5,{
@@ -5839,15 +5881,15 @@ function Fatality.new(Window: Window)
 				})
 			else
 				Fatality:CreateAnimation(Left,0.5,{
-					Position = UDim2.new(0.175, 0, 0.5, 1)
+					Position = (tabsActive and (TAB_GEOM.LeftPos + UDim2.new(0, 0, 0, 1))) or UDim2.new(0.175, 0, 0.5, 1)
 				})
 
 				Fatality:CreateAnimation(Center,0.5,{
-					Position = UDim2.new(0.5, 0, 0.5, 2)
+					Position = (tabsActive and (TAB_GEOM.CenterPos + UDim2.new(0, 0, 0, 2))) or UDim2.new(0.5, 0, 0.5, 2)
 				})
 
 				Fatality:CreateAnimation(Right,0.5,{
-					Position = UDim2.new(0.825, 0, 0.5, 3)
+					Position = (tabsActive and (TAB_GEOM.RightPos + UDim2.new(0, 0, 0, 3))) or UDim2.new(0.825, 0, 0.5, 3)
 				})
 
 				Fatality:CreateAnimation(MenuButton,0.5,{
@@ -5990,6 +6032,9 @@ function Fatality.new(Window: Window)
 			Preview.ClipsDescendants = true
 			Preview.ZIndex = 15;
 			Preview.Size = UDim2.new(1, 0, 0, 25 + Config.Height)
+			sectionOrder = sectionOrder + 1;
+			Preview.LayoutOrder = sectionOrder;
+			frameColumn[Preview] = Preview.Parent;
 	
 			PreviewName.Name = "PreviewName"
 			PreviewName.Parent = Preview
@@ -6128,6 +6173,9 @@ function Fatality.new(Window: Window)
 			ListBox.Size = UDim2.new(1, 0, 0, 350)
 			ListBox.ZIndex = 10
 			ListBox.ClipsDescendants = true;
+			sectionOrder = sectionOrder + 1;
+			ListBox.LayoutOrder = sectionOrder;
+			frameColumn[ListBox] = ListBox.Parent;
 
 			Fatality:AddDragBlacklist(ScrollingFrame);
 
@@ -6544,24 +6592,28 @@ function Fatality.new(Window: Window)
 		local function clampSections()
 			for _, lay in ipairs({ UIListLayout, UIListLayout_2, UIListLayout_3 }) do
 				pcall(function()
-					if lay.Padding.Offset ~= 2 then
-						lay.Padding = UDim.new(0, 2);
+					if lay.Padding.Offset ~= 6 then
+						lay.Padding = UDim.new(0, 6);
 					end;
+					pcall(function() lay:ApplyLayout(); end);
 				end);
 			end;
-			for _, col in ipairs({ Left, Center, Right }) do
+			-- Enforce full-width sections in every column AND in the hidden
+			-- holder (hidden frames keep a sane size so re-showing is exact).
+			-- Never touch Position: UIListLayout owns it, and fighting it is
+			-- another source of phantom gaps.
+			local function clampFrame(f)
+				if typeof(f) == "Instance" and f:IsA("GuiObject") and f:GetAttribute("FatalSection") then
+					local size = f.Size;
+					if size.X.Scale ~= 1 or size.X.Offset ~= 0 then
+						f.Size = UDim2.new(1, 0, size.Y.Scale, size.Y.Offset);
+					end;
+				end;
+			end;
+			for _, col in ipairs({ Left, Center, Right, TabHidden }) do
 				pcall(function()
 					for _, f in ipairs(col:GetChildren()) do
-						if typeof(f) == "Instance" and f:IsA("GuiObject") and f:GetAttribute("FatalSection") then
-							local pos = f.Position;
-							if pos.X.Scale ~= 0 or pos.X.Offset < 0 then
-								f.Position = UDim2.new(0, 0, pos.Y.Scale, pos.Y.Offset);
-							end;
-							local size = f.Size;
-							if size.X.Scale ~= 1 or size.X.Offset > 0 then
-								f.Size = UDim2.new(1, 0, size.Y.Scale, size.Y.Offset);
-							end;
-						end;
+						clampFrame(f);
 					end;
 				end);
 			end;
@@ -6631,6 +6683,9 @@ function Fatality.new(Window: Window)
 			Section.ClipsDescendants = true
 			Section.Size = UDim2.new(1, 0, 0, 0)
 			Section:SetAttribute("FatalSection", true)
+			sectionOrder = sectionOrder + 1;
+			Section.LayoutOrder = sectionOrder;
+			frameColumn[Section] = Section.Parent;
 
 			Elements.Name = Fatality:RandomString()
 			Elements.Parent = Section
@@ -6676,17 +6731,37 @@ function Fatality.new(Window: Window)
 			SectionName.TextXAlignment = Enum.TextXAlignment.Left
 
 
-			UIListLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
-				local MainScale = UIListLayout.AbsoluteContentSize.Y + 26 + Config.Height;
-
-				if not Menu.AutoFill then
-					Fatality:CreateAnimation(Section,0.25,{
-						Size = UDim2.new(1, 0, 0, MainScale)
-					})
-				else
-					Section.Size = UDim2.new(1,0,0,MainScale / 2.5);
+			-- Auto-height: set instantly (no tween). Tweening Y while the
+			-- column UIListLayout reflows every frame is the second gap
+			-- source: overlapping tweens settle on stale heights and leave
+			-- phantom space. Debounce to one set per frame during bulk adds.
+			local resizePending = false;
+			local function applySectionHeight()
+				resizePending = false;
+				local contentH = 0;
+				pcall(function()
+					contentH = UIListLayout.AbsoluteContentSize.Y;
+				end);
+				local MainScale = contentH + 26 + Config.Height;
+				if Menu.AutoFill then
+					MainScale = MainScale / 2.5;
 				end;
+				if MainScale < 0 then MainScale = 0; end;
+				-- Skip no-op writes: every Size set re-triggers the column
+				-- layout, so redundant writes cause layout thrash.
+				local cur = Section.Size;
+				if cur.X.Scale == 1 and cur.X.Offset == 0 and cur.Y.Scale == 0 and math.abs(cur.Y.Offset - MainScale) < 0.5 then
+					return;
+				end;
+				Section.Size = UDim2.new(1, 0, 0, MainScale);
+			end;
+			UIListLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
+				if resizePending then return; end;
+				resizePending = true;
+				task.defer(applySectionHeight);
 			end);
+			-- First measure happens after the current frame's layout pass.
+			task.defer(applySectionHeight);
 
 			Toggle(BindEvent:GetAttribute('V'));
 
@@ -6709,9 +6784,13 @@ function Fatality.new(Window: Window)
 
 		-- Sub-tabs (side tabs like Local / Enemy / Team / World). The first
 		-- AddTab call builds a left strip and indents the three columns;
-		-- each tab owns the sections created through it and shows only them
-		-- while selected. Sections added directly to the menu are never
-		-- hidden. Tabs stack their sections with the normal column layout.
+		-- each tab owns the sections created through it. Hidden tab sections
+		-- are REPARENTED to a detached holder (not just Visible=false) so
+		-- they reserve zero space — Visible=false alone still reserves space
+		-- on several client versions and produces the random BIG gaps.
+		-- Explicit LayoutOrder (assigned at creation) keeps the stack order
+		-- stable across reparenting. Sections added directly to the menu are
+		-- never hidden.
 		local Tabs = {};
 		local SelectedTab = nil;
 		local TabsStrip = nil;
@@ -6739,10 +6818,28 @@ function Fatality.new(Window: Window)
 				end;
 				for _, f in ipairs(t.Frames) do
 					pcall(function()
-						if typeof(f) == "Instance" then f.Visible = on; end;
+						if typeof(f) == "Instance" then
+							if on then
+								local home = frameColumn[f];
+								if home and f.Parent ~= home then
+									f.Parent = home;
+								end;
+								f.Visible = true;
+							else
+								f.Visible = false;
+								if f.Parent ~= TabHidden then
+									f.Parent = TabHidden;
+								end;
+							end;
+						end;
 					end);
 				end;
 			end;
+			-- Re-run layouts so positions + canvas sizes settle in the same
+			-- frame instead of leaving one frame of stale (gapped) layout.
+			pcall(function() UIListLayout:ApplyLayout(); end);
+			pcall(function() UIListLayout_2:ApplyLayout(); end);
+			pcall(function() UIListLayout_3:ApplyLayout(); end);
 			if TabIndicator and idx > 0 then
 				Fatality:CreateAnimation(TabIndicator, 0.35, {
 					Position = UDim2.new(0, 8, 0, (idx - 1) * 28 + 11),
@@ -6760,15 +6857,20 @@ function Fatality.new(Window: Window)
 
 		local function ensureTabsUI()
 			if TabsStrip then return; end;
+			tabsActive = true;
+			-- Wider columns pulled closer to the strip: 6px strip gap, 5px
+			-- inter-column gaps, 6px right margin. Shared TAB_GEOM constants
+			-- (also used by the show/hide column animations above) so the
+			-- columns can never drift back to the narrow layout.
 			Left.AnchorPoint = Vector2.new(0, 0.5);
-			Left.Position = UDim2.new(0, 122, 0.5, 0);
-			Left.Size = UDim2.new(1 / 3, -47.33, 1, -5);
+			Left.Position = TAB_GEOM.LeftPos;
+			Left.Size = TAB_GEOM.Size;
 			Center.AnchorPoint = Vector2.new(0, 0.5);
-			Center.Position = UDim2.new(1 / 3, 80.67, 0.5, 0);
-			Center.Size = UDim2.new(1 / 3, -47.33, 1, -5);
+			Center.Position = TAB_GEOM.CenterPos;
+			Center.Size = TAB_GEOM.Size;
 			Right.AnchorPoint = Vector2.new(0, 0.5);
-			Right.Position = UDim2.new(2 / 3, 39.33, 0.5, 0);
-			Right.Size = UDim2.new(1 / 3, -47.33, 1, -5);
+			Right.Position = TAB_GEOM.RightPos;
+			Right.Size = TAB_GEOM.Size;
 			TabsStrip = Instance.new("Frame");
 			local StripList = Instance.new("UIListLayout");
 			TabsStrip.Name = Fatality:RandomString();
@@ -6777,8 +6879,8 @@ function Fatality.new(Window: Window)
 			TabsStrip.BackgroundTransparency = 1.000;
 			TabsStrip.BorderColor3 = Color3.fromRGB(0, 0, 0);
 			TabsStrip.BorderSizePixel = 0;
-			TabsStrip.Position = UDim2.new(0, 6, 0, 5);
-			TabsStrip.Size = UDim2.new(0, 104, 1, -10);
+			TabsStrip.Position = UDim2.new(0, 4, 0, 5);
+			TabsStrip.Size = UDim2.new(0, 100, 1, -10);
 			TabsStrip.ZIndex = 7;
 			StripList.Parent = TabsStrip;
 			StripList.SortOrder = Enum.SortOrder.LayoutOrder;
@@ -6840,7 +6942,23 @@ function Fatality.new(Window: Window)
 				local els = MenuLib:AddSection(Config);
 				if type(els) == "table" and typeof(els._Section) == "Instance" then
 					table.insert(tab.Frames, els._Section);
-					els._Section.Visible = (SelectedTab == tab);
+					-- Park non-selected sections in the hidden holder right
+					-- away so they never flash nor reserve layout space.
+					local show = (SelectedTab == tab);
+					pcall(function()
+						if show then
+							local home = frameColumn[els._Section];
+							if home and els._Section.Parent ~= home then
+								els._Section.Parent = home;
+							end;
+							els._Section.Visible = true;
+						else
+							els._Section.Visible = false;
+							if els._Section.Parent ~= TabHidden then
+								els._Section.Parent = TabHidden;
+							end;
+						end;
+					end);
 				end;
 				return els;
 			end;
