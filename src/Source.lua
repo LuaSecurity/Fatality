@@ -3588,6 +3588,12 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 				end);
 				return false;
 			end;
+			pcall(function()
+				local hrp = clone:FindFirstChild("HumanoidRootPart")
+				if hrp then
+					hrp.CFrame = CFrame.new(0, 0, 0)
+				end
+			end);
 			model = clone;
 			clonedFrom = okChar;
 			return true;
@@ -3685,21 +3691,15 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 						hideAll();
 						return;
 					end;
-					local mid = root.Position + Vector3.new(0, -0.5, 0);
-					local theta = 0;
+					vCam.ViewportSize = vs;
+					vCam.FieldOfView = 55;
+					vCam.CFrame = CFrame.new(Vector3.new(0, 2, 5), Vector3.new(0, 0, 0));
 					if data.rotate ~= false then
-						theta = tick() * 0.35 % 6.283185307179586;
 						pcall(function()
 							local piv = model:GetPivot()
 							model:PivotTo((piv - piv.Position) * CFrame.Angles(0, 0.05, 0) + piv.Position)
 						end);
 					end;
-					vCam.ViewportSize = vs;
-					vCam.FieldOfView = 55;
-					local orbD = 7;
-					local orbE = 0.12;
-					local orbC = math.cos(orbE);
-					vCam.CFrame = CFrame.new(mid + Vector3.new(math.cos(theta) * orbD * orbC, math.sin(orbE) * orbD, math.sin(theta) * orbD * orbC), mid);
 					local pTop = project(head.Position + Vector3.new(0, 0.6, 0));
 					local pFeet = project(root.Position - Vector3.new(0, 3.2, 0));
 					if not pTop or not pFeet then
