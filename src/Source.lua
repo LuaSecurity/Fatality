@@ -3635,11 +3635,39 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					pcall(function()
 						data = Config.Provider() or {};
 					end);
-					pcall(function()
-						model:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, tick() * 0.35 % 6.283185307179586, 0));
-					end);
+					local camDist = tonumber(data.camDist) or 7;
+					if camDist < 3 then
+						camDist = 3;
+					end;
+					if camDist > 16 then
+						camDist = 16;
+					end;
+					local camHeight = tonumber(data.camHeight) or 0.2;
+					if camHeight < -4 then
+						camHeight = -4;
+					end;
+					if camHeight > 5 then
+						camHeight = 5;
+					end;
+					local camFov = tonumber(data.camFov) or 55;
+					if camFov < 20 then
+						camFov = 20;
+					end;
+					if camFov > 100 then
+						camFov = 100;
+					end;
+					if data.rotate == false then
+						pcall(function()
+							model:PivotTo(CFrame.new(0, 0, 0));
+						end);
+					else
+						pcall(function()
+							model:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, tick() * 0.35 % 6.283185307179586, 0));
+						end);
+					end;
 					vCam.ViewportSize = vs;
-					vCam.CFrame = CFrame.new(Vector3.new(0, 0.6, 8.5), Vector3.new(0, -0.3, 0));
+					vCam.FieldOfView = camFov;
+					vCam.CFrame = CFrame.new(Vector3.new(0, camHeight, camDist), Vector3.new(0, -0.4, 0));
 					local root = model:FindFirstChild("HumanoidRootPart");
 					local head = model:FindFirstChild("Head");
 					if not root or not head then
