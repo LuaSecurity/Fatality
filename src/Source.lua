@@ -3445,9 +3445,6 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		View.Position = UDim2.new(0, 6, 0, 20)
 		View.Size = UDim2.new(1, -12, 1, -26)
 		View.ZIndex = ZIndex + 2
-		View.LightDirection = Vector3.new(-0.5, -1, -0.5)
-		View.LightColor = Color3.fromRGB(255, 255, 255)
-		View.Ambient = Color3.fromRGB(170, 170, 180)
 
 		local World = Instance.new("WorldModel")
 		World.Parent = View
@@ -3526,7 +3523,6 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			vCam.Parent = View
 		end)
 		View.CurrentCamera = vCam
-		local lastFix = ""
 
 		local clonedFrom = nil;
 		local model = nil;
@@ -3566,19 +3562,6 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			if not ok or not clone then
 				return false;
 			end;
-			pcall(function()
-				local junk = {};
-				for _, d in ipairs(clone:GetDescendants()) do
-					if d:IsA("Humanoid") or d:IsA("Script") or d:IsA("BaseScript") or d:IsA("ModuleScript") then
-						table.insert(junk, d);
-					end;
-				end;
-				for _, d in ipairs(junk) do
-					pcall(function()
-						d:Destroy()
-					end);
-				end;
-			end);
 			pcall(function()
 				clone.Parent = World
 			end);
@@ -3661,26 +3644,6 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 						Placeholder.Visible = true;
 						return;
 					end;
-					pcall(function()
-						local fixes = {};
-						if View.CurrentCamera ~= vCam then
-							View.CurrentCamera = vCam;
-							table.insert(fixes, "cam");
-						end;
-						if World.Parent ~= View then
-							World.Parent = View;
-							table.insert(fixes, "world");
-						end;
-						if model.Parent ~= World then
-							model.Parent = World;
-							table.insert(fixes, "model");
-						end;
-						local key = table.concat(fixes, ",");
-						if key ~= "" and key ~= lastFix then
-							lastFix = key;
-							print("PreviewDbg refixed " .. key);
-						end;
-					end);
 					local data = {};
 					pcall(function()
 						data = Config.Provider() or {};
