@@ -3556,6 +3556,19 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 				return false;
 			end;
 			pcall(function()
+				local junk = {};
+				for _, d in ipairs(clone:GetDescendants()) do
+					if d:IsA("Humanoid") or d:IsA("Script") or d:IsA("BaseScript") or d:IsA("ModuleScript") then
+						table.insert(junk, d);
+					end;
+				end;
+				for _, d in ipairs(junk) do
+					pcall(function()
+						d:Destroy()
+					end);
+				end;
+			end);
+			pcall(function()
 				clone.Parent = World
 			end);
 			if clone.Parent ~= World then
