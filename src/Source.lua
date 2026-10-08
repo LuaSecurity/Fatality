@@ -772,6 +772,7 @@ function Fatality:CreateColorPicker(ColorBox: Frame,Transparency, Callback)
 	local CodeH,CodeV = 1, 1;
 	local IsPressM1 = false;
 	local UI_SPAWN_THREAD;
+	local pickerOpen = false;
 
 	local updateColor = function()
 		local H , S , V = ColorBox.BackgroundColor3:ToHSV();
@@ -782,6 +783,7 @@ function Fatality:CreateColorPicker(ColorBox: Frame,Transparency, Callback)
 	end;
 
 	local VisibleToggle = function(value)
+		pickerOpen = (value == true);
 		if value then
 			ColorPickBox.BackgroundColor3 = Color3.fromHSV(OldCode,1,1);
 			ColorOpc.BackgroundColor3 = ColorBox.BackgroundColor3;
@@ -1265,6 +1267,12 @@ function Fatality:CreateColorPicker(ColorBox: Frame,Transparency, Callback)
 
 		UserInputService.InputBegan:Connect(function(Input)
 			if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+				-- Guard: closed pickers used to run a hit-test + ~10 close
+				-- tweens on EVERY global click (hundreds per click across a
+				-- big menu, even with the menu closed / in-game).
+				if not pickerOpen then
+					return;
+				end;
 				if not Fatality:IsMouseOverFrame(ColorPickerFrame) then
 					VisibleToggle(false);
 				end;
@@ -6938,7 +6946,9 @@ function Fatality.new(Window: Window)
 
 		Fatality:AddDragBlacklist(SearchFrame);
 
+		local searchOpen = false;
 		local SearchToggle = function(value)
+			searchOpen = (value == true);
 			if value then
 				SearchFrame.Position = UDim2.fromOffset(SearchButton.AbsolutePosition.X - 5,SearchButton.AbsolutePosition.Y + (SearchButton.AbsoluteSize.Y * 3))
 
@@ -7241,7 +7251,9 @@ function Fatality.new(Window: Window)
 
 		inputBegan2 = UserInputService.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-				if not Fatality:IsMouseOverFrame(SearchFrame) then
+				-- Guard: closed search used to run a hit-test + 7 tweens +
+				-- a child-destroy sweep on EVERY global click.
+				if searchOpen and not Fatality:IsMouseOverFrame(SearchFrame) then
 					SearchToggle(false);
 				end
 			end
