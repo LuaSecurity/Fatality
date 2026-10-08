@@ -3421,7 +3421,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		Box.BackgroundTransparency = 0.300
 		Box.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		Box.BorderSizePixel = 0
-		Box.Size = UDim2.new(1, -12, 0, Config.Height)
+		Box.Size = UDim2.new(1, -8, 0, Config.Height)
 		Box.ZIndex = ZIndex + 1
 		Box.ClipsDescendants = true
 		Fatality:AddDragBlacklist(Box);
@@ -3447,8 +3447,8 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		View.Parent = Box
 		View.BackgroundTransparency = 1.000
 		View.BorderSizePixel = 0
-		View.Position = UDim2.new(0, 4, 0, 20)
-		View.Size = UDim2.new(1, -8, 1, -26)
+		View.Position = UDim2.new(0, 2, 0, 20)
+		View.Size = UDim2.new(1, -4, 1, -26)
 		View.ZIndex = ZIndex + 2
 
 		local World = Instance.new("WorldModel")
