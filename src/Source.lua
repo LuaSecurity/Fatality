@@ -3446,7 +3446,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		View.ZIndex = ZIndex + 2
 		View.LightDirection = Vector3.new(-0.5, -1, -0.5)
 		View.LightColor = Color3.fromRGB(255, 255, 255)
-		View.Ambient = Color3.fromRGB(140, 140, 150)
+		View.Ambient = Color3.fromRGB(170, 170, 180)
 
 		local World = Instance.new("WorldModel")
 		World.Parent = View
@@ -3525,7 +3525,8 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 
 		local clonedFrom = nil;
 		local model = nil;
-	 local wantRefresh = false;
+		local wantRefresh = false;
+		local fitDist = 7;
 
 		local function clearModel()
 			if model then
@@ -3635,27 +3636,6 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					pcall(function()
 						data = Config.Provider() or {};
 					end);
-					local camDist = tonumber(data.camDist) or 7;
-					if camDist < 3 then
-						camDist = 3;
-					end;
-					if camDist > 16 then
-						camDist = 16;
-					end;
-					local camHeight = tonumber(data.camHeight) or 0.2;
-					if camHeight < -4 then
-						camHeight = -4;
-					end;
-					if camHeight > 5 then
-						camHeight = 5;
-					end;
-					local camFov = tonumber(data.camFov) or 55;
-					if camFov < 20 then
-						camFov = 20;
-					end;
-					if camFov > 100 then
-						camFov = 100;
-					end;
 					if data.rotate == false then
 						pcall(function()
 							model:PivotTo(CFrame.new(0, 0, 0));
@@ -3666,8 +3646,8 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 						end);
 					end;
 					vCam.ViewportSize = vs;
-					vCam.FieldOfView = camFov;
-					vCam.CFrame = CFrame.new(Vector3.new(0, camHeight, camDist), Vector3.new(0, -0.4, 0));
+					vCam.FieldOfView = 55;
+					vCam.CFrame = CFrame.new(Vector3.new(0, -0.4 + fitDist * 0.12, fitDist), Vector3.new(0, -0.5, 0));
 					local root = model:FindFirstChild("HumanoidRootPart");
 					local head = model:FindFirstChild("Head");
 					if not root or not head then
@@ -3684,6 +3664,18 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					if h < 4 then
 						h = 4;
 					end;
+					pcall(function()
+						local want = vs.Y * 0.62;
+						if h > 8 and want > 8 then
+							fitDist = fitDist * (want / h);
+							if fitDist < 3 then
+								fitDist = 3;
+							end;
+							if fitDist > 18 then
+								fitDist = 18;
+							end;
+						end;
+					end);
 					local w = h / 2;
 					local cx = pFeet.X;
 					local left = cx - w / 2;
