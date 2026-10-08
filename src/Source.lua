@@ -3575,8 +3575,13 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 				local hrp = clone:FindFirstChild("HumanoidRootPart")
 				if hrp then
 					hrp.CFrame = CFrame.new(0, 0, 0)
+				else
+					clone:Destroy()
 				end
 			end);
+			if not clone.Parent then
+				return false;
+			end;
 			model = clone;
 			clonedFrom = okChar;
 			return true;
@@ -3635,7 +3640,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 						return;
 					end;
 					Placeholder.Visible = false;
-					if char ~= clonedFrom or wantRefresh or not model or model.Parent ~= World then
+					if char ~= clonedFrom or wantRefresh or not model or model.Parent ~= World or not model:FindFirstChild("HumanoidRootPart") then
 						wantRefresh = false;
 						refreshModel();
 					end;
