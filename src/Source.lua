@@ -785,6 +785,16 @@ function Fatality:CreateColorPicker(ColorBox: Frame,Transparency, Callback)
 	local VisibleToggle = function(value)
 		pickerOpen = (value == true);
 		if value then
+			-- Self-heal: if the well wasn't under a window when the picker
+			-- was constructed (direct CreateColorPicker calls on unparented
+			-- frames), the popup parented to nil and would never show.
+			-- Re-resolve on open so it can never get stuck invisible.
+			if ColorPickerFrame.Parent == nil then
+				pcall(function()
+					local w = Fatality:GetWindowFromElement(ColorBox);
+					if w then ColorPickerFrame.Parent = w; end;
+				end);
+			end;
 			ColorPickBox.BackgroundColor3 = Color3.fromHSV(OldCode,1,1);
 			ColorOpc.BackgroundColor3 = ColorBox.BackgroundColor3;
 
