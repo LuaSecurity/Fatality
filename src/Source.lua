@@ -3395,6 +3395,15 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		Config.Name = Config.Name or "Preview";
 		Config.Height = Config.Height or 240;
 		Config.Flag = Config.Flag or nil;
+		Config.Provider = Config.Provider or function()
+			return {};
+		end;
+		local runElevated = Config.Elevate;
+		if type(runElevated) ~= "function" then
+			runElevated = function(fn)
+				return pcall(fn);
+			end;
+		end;
 
 		local Box = Instance.new("Frame")
 		local BoxCorner = Instance.new("UICorner")
@@ -3467,6 +3476,8 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 
 		local characterClone = nil;
 		local charAddedConn = nil;
+		local wantRotate = true;
+		local rotConn = nil;
 
 		local function updateViewport(char)
 			if not char then
@@ -3512,7 +3523,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			local hrp = characterClone:FindFirstChild("HumanoidRootPart")
 			if hrp then
 				pcall(function()
-					hrp.CFrame = CFrame.new(0, 0, 0)
+					hrp.CFrame = CFrame.new(0, 0, 0) * CFrame.Angles(0, math.pi, 0)
 				end);
 				pcall(function()
 					vCam.CFrame = CFrame.new(Vector3.new(0, 2, 5), hrp.Position)
@@ -3535,6 +3546,45 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			else
 				Placeholder.Visible = true;
 			end;
+		end);
+
+		task.spawn(function()
+			while Box.Parent do
+				task.wait(0.15);
+				runElevated(function()
+					local data = Config.Provider() or {};
+					if data.rotate == nil then
+						wantRotate = true;
+					else
+						wantRotate = data.rotate ~= false;
+					end;
+				end);
+			end;
+		end);
+
+		pcall(function()
+			rotConn = RunService.RenderStepped:Connect(function()
+				if not Box.Parent then
+					return;
+				end;
+				if not characterClone or not characterClone.Parent then
+					return;
+				end;
+				local hrp = characterClone:FindFirstChild("HumanoidRootPart");
+				if not hrp then
+					return;
+				end;
+				if wantRotate then
+					local theta = tick() * 0.9;
+					pcall(function()
+						vCam.CFrame = CFrame.new(hrp.Position + Vector3.new(math.sin(theta) * 5, 2, math.cos(theta) * 5), hrp.Position);
+					end);
+				else
+					pcall(function()
+						vCam.CFrame = CFrame.new(Vector3.new(0, 2, 5), hrp.Position);
+					end);
+				end;
+			end);
 		end);
 
 		local OpcToggle = function(value)
@@ -3569,6 +3619,11 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 				pcall(function()
 					if charAddedConn then
 						charAddedConn:Disconnect()
+					end;
+				end);
+				pcall(function()
+					if rotConn then
+						rotConn:Disconnect()
 					end;
 				end);
 				pcall(function()
