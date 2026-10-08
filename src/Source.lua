@@ -41,7 +41,7 @@ export type Listbox = {
 	Name: string,
 	Option: boolean,
 	Multi: boolean,
-	Position: string,
+	Position: string,	
 	Flag: string | nil,
 	Height: number,
 	Default: ValueBase,
