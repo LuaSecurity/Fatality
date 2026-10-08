@@ -3444,6 +3444,12 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		View.Position = UDim2.new(0, 6, 0, 20)
 		View.Size = UDim2.new(1, -12, 1, -26)
 		View.ZIndex = ZIndex + 2
+		View.LightDirection = Vector3.new(-0.5, -1, -0.5)
+		View.LightColor = Color3.fromRGB(255, 255, 255)
+		View.Ambient = Color3.fromRGB(140, 140, 150)
+
+		local World = Instance.new("WorldModel")
+		World.Parent = View
 
 		Overlay.Name = Fatality:RandomString()
 		Overlay.Parent = View
@@ -3540,6 +3546,9 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			if not okChar then
 				return false;
 			end;
+			pcall(function()
+				okChar.Archivable = true
+			end);
 			local ok, clone = pcall(function()
 				return okChar:Clone()
 			end);
@@ -3547,9 +3556,9 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 				return false;
 			end;
 			pcall(function()
-				clone.Parent = View
+				clone.Parent = World
 			end);
-			if not clone.Parent then
+			if clone.Parent ~= World then
 				pcall(function()
 					clone:Destroy()
 				end);
@@ -3602,7 +3611,6 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					if vs.X < 10 or vs.Y < 10 then
 						return;
 					end;
-					local data = Config.Provider() or {};
 					local char = nil;
 					pcall(function()
 						char = game:GetService("Players").LocalPlayer.Character
@@ -3614,7 +3622,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 						return;
 					end;
 					Placeholder.Visible = false;
-					if char ~= clonedFrom or wantRefresh or not model or not model.Parent then
+					if char ~= clonedFrom or wantRefresh or not model or model.Parent ~= World then
 						wantRefresh = false;
 						refreshModel();
 					end;
@@ -3623,6 +3631,10 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 						Placeholder.Visible = true;
 						return;
 					end;
+					local data = {};
+					pcall(function()
+						data = Config.Provider() or {};
+					end);
 					pcall(function()
 						model:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, tick() * 0.35 % 6.283185307179586, 0));
 					end);
