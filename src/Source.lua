@@ -3469,6 +3469,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		Placeholder.Visible = false
 
 		local vCam = Instance.new("Camera")
+		vCam.FieldOfView = 60
 		pcall(function()
 			vCam.Parent = View
 		end)
@@ -3528,7 +3529,7 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					hrp.CFrame = CFrame.new(0, 0, 0) * CFrame.Angles(0, math.pi, 0)
 				end);
 				pcall(function()
-					vCam.CFrame = CFrame.new(Vector3.new(0, 2, 5), hrp.Position)
+					vCam.CFrame = CFrame.new(Vector3.new(0, 2, 8), hrp.Position)
 				end);
 				Placeholder.Visible = false;
 			else
@@ -4165,12 +4166,12 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					local theta = tick() * 0.9;
 					lastTheta = theta;
 					pcall(function()
-						vCam.CFrame = CFrame.new(hrp.Position + Vector3.new(math.sin(theta) * 5, 2, math.cos(theta) * 5), hrp.Position);
+						vCam.CFrame = CFrame.new(hrp.Position + Vector3.new(math.sin(theta) * 8, 2, math.cos(theta) * 8), hrp.Position);
 					end);
 				else
 					lastTheta = 0;
 					pcall(function()
-						vCam.CFrame = CFrame.new(Vector3.new(0, 2, 5), hrp.Position);
+						vCam.CFrame = CFrame.new(Vector3.new(0, 2, 8), hrp.Position);
 					end);
 				end;
 				drawOverlay(hrp);
