@@ -3394,16 +3394,12 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		Config = Config or {};
 		Config.Name = Config.Name or "Preview";
 		Config.Height = Config.Height or 240;
-		Config.Provider = Config.Provider or function()
-			return {};
-		end;
 		Config.Flag = Config.Flag or nil;
 
 		local Box = Instance.new("Frame")
 		local BoxCorner = Instance.new("UICorner")
 		local Title = Instance.new("TextLabel")
 		local View = Instance.new("ViewportFrame")
-		local Overlay = Instance.new("Frame")
 		local Placeholder = Instance.new("TextLabel")
 
 		if SearchAPI then
@@ -3449,16 +3445,8 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		local World = Instance.new("WorldModel")
 		World.Parent = View
 
-		Overlay.Name = Fatality:RandomString()
-		Overlay.Parent = View
-		Overlay.BackgroundTransparency = 1.000
-		Overlay.BorderSizePixel = 0
-		Overlay.Size = UDim2.new(1, 0, 1, 0)
-		Overlay.ZIndex = ZIndex + 3
-		Overlay.ClipsDescendants = true
-
 		Placeholder.Name = Fatality:RandomString()
-		Placeholder.Parent = Overlay
+		Placeholder.Parent = View
 		Placeholder.AnchorPoint = Vector2.new(0.5, 0.5)
 		Placeholder.BackgroundTransparency = 1.000
 		Placeholder.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -3471,96 +3459,44 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		Placeholder.TextTransparency = 0.500
 		Placeholder.Visible = false
 
-		local function mkEdge()
-			local f = Instance.new("Frame")
-			f.BorderSizePixel = 0
-			f.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-			f.Visible = false
-			f.ZIndex = ZIndex + 4
-			f.Parent = Overlay
-			return f
-		end;
-
-		local edgeT, edgeB, edgeL, edgeR = mkEdge(), mkEdge(), mkEdge(), mkEdge();
-		local hbBg, hbFill = mkEdge(), mkEdge();
-		hbBg.BackgroundColor3 = Color3.fromRGB(20, 20, 20);
-
-		local nameL = Instance.new("TextLabel")
-		nameL.BackgroundTransparency = 1.000
-		nameL.AnchorPoint = Vector2.new(0.5, 1)
-		nameL.Size = UDim2.new(1, -10, 0, 14)
-		nameL.ZIndex = ZIndex + 4
-		nameL.FontFace = Fatality.FontSemiBold
-		nameL.TextColor3 = Color3.fromRGB(255, 255, 255)
-		nameL.TextSize = 13.000
-		nameL.TextStrokeTransparency = 0.500
-		nameL.Visible = false
-		nameL.Parent = Overlay
-
-		local subL = Instance.new("TextLabel")
-		subL.BackgroundTransparency = 1.000
-		subL.AnchorPoint = Vector2.new(0.5, 0)
-		subL.Size = UDim2.new(1, -10, 0, 13)
-		subL.ZIndex = ZIndex + 4
-		subL.FontFace = Fatality.FontSemiBold
-		subL.TextColor3 = Color3.fromRGB(220, 220, 220)
-		subL.TextSize = 12.000
-		subL.TextStrokeTransparency = 0.500
-		subL.Visible = false
-		subL.Parent = Overlay
-
-		local tracer = Instance.new("Frame")
-		tracer.BorderSizePixel = 0
-		tracer.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		tracer.AnchorPoint = Vector2.new(0.5, 0.5)
-		tracer.Visible = false
-		tracer.ZIndex = ZIndex + 3
-		tracer.Parent = Overlay
-
 		local vCam = Instance.new("Camera")
-		vCam.FieldOfView = 60
 		pcall(function()
 			vCam.Parent = View
 		end)
 		View.CurrentCamera = vCam
 
-		local clonedFrom = nil;
-		local model = nil;
-		local wantRefresh = false;
-		local runElevated = Config.Elevate;
-		if type(runElevated) ~= "function" then
-			runElevated = function(fn)
-				return pcall(fn);
-			end;
-		end;
+		local characterClone = nil;
+		local charAddedConn = nil;
 
-		local function clearModel()
-			if model then
+		local function updateViewport(char)
+			if not char then
+				if characterClone then
+					pcall(function()
+						characterClone:Destroy()
+					end)
+				end;
+				characterClone = nil;
+				Placeholder.Visible = true;
+				return;
+			end;
+			if characterClone then
 				pcall(function()
-					model:Destroy()
+					characterClone:Destroy()
 				end)
+				characterClone = nil;
 			end;
-			model = nil;
-			clonedFrom = nil;
-		end;
-
-		local function refreshModel()
-			clearModel();
-			local okChar = nil;
 			pcall(function()
-				okChar = game:GetService("Players").LocalPlayer.Character
+				char:WaitForChild("HumanoidRootPart", 5)
 			end);
-			if not okChar then
-				return false;
-			end;
 			pcall(function()
-				okChar.Archivable = true
+				char.Archivable = true
 			end);
 			local ok, clone = pcall(function()
-				return okChar:Clone()
+				return char:Clone()
 			end);
 			if not ok or not clone then
-				return false;
+				Placeholder.Visible = true;
+				return;
 			end;
 			pcall(function()
 				clone.Parent = World
@@ -3569,188 +3505,35 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 				pcall(function()
 					clone:Destroy()
 				end);
-				return false;
-			end;
-			pcall(function()
-				local hrp = clone:FindFirstChild("HumanoidRootPart")
-				if hrp then
-					hrp.CFrame = CFrame.new(0, 0, 0)
-				else
-					clone:Destroy()
-				end
-			end);
-			if not clone.Parent then
-				return false;
-			end;
-			model = clone;
-			clonedFrom = okChar;
-			return true;
-		end;
-
-		local function project(p)
-			local sp, vis = vCam:WorldToViewportPoint(p)
-			if not vis then
-				return nil;
-			end;
-			return Vector2.new(sp.X, sp.Y);
-		end;
-
-		local function setTracer(a, b, color)
-			local d = b - a;
-			local len = d.Magnitude;
-			if len < 2 then
-				tracer.Visible = false;
+				Placeholder.Visible = true;
 				return;
 			end;
-			tracer.Position = UDim2.fromOffset((a.X + b.X) / 2, (a.Y + b.Y) / 2);
-			tracer.Size = UDim2.fromOffset(len, 1);
-			tracer.Rotation = math.deg(math.atan2(d.Y, d.X));
-			tracer.BackgroundColor3 = color;
-			tracer.Visible = true;
-		end;
-
-		local function hideAll()
-			edgeT.Visible = false;
-			edgeB.Visible = false;
-			edgeL.Visible = false;
-			edgeR.Visible = false;
-			hbBg.Visible = false;
-			hbFill.Visible = false;
-			nameL.Visible = false;
-			subL.Visible = false;
-			tracer.Visible = false;
-		end;
-
-		task.spawn(function()
-			while Box.Parent do
-				task.wait(0.15);
-				runElevated(function()
-					local vs = View.AbsoluteSize;
-					if vs.X < 10 or vs.Y < 10 then
-						return;
-					end;
-					local char = nil;
-					pcall(function()
-						char = game:GetService("Players").LocalPlayer.Character
-					end);
-					if not char then
-						clearModel();
-						hideAll();
-						Placeholder.Visible = true;
-						return;
-					end;
-					Placeholder.Visible = false;
-					if char ~= clonedFrom or wantRefresh or not model or model.Parent ~= World or not model:FindFirstChild("HumanoidRootPart") then
-						wantRefresh = false;
-						refreshModel();
-					end;
-					if not model then
-						hideAll();
-						Placeholder.Visible = true;
-						return;
-					end;
-					local data = {};
-					pcall(function()
-						data = Config.Provider() or {};
-					end);
-					local root = model:FindFirstChild("HumanoidRootPart");
-					local head = model:FindFirstChild("Head");
-					if not root or not head then
-						hideAll();
-						return;
-					end;
-					vCam.ViewportSize = vs;
-					vCam.FieldOfView = 55;
-					local theta = math.pi;
-					if data.rotate ~= false then
-						theta = math.pi + tick() * 0.35 % 6.283185307179586;
-					end;
-					vCam.CFrame = CFrame.new(root.Position + Vector3.new(math.sin(theta) * 5, 2, math.cos(theta) * 5), root.Position);
-					local pTop = project(head.Position + Vector3.new(0, 0.6, 0));
-					local pFeet = project(root.Position - Vector3.new(0, 3.2, 0));
-					if not pTop or not pFeet then
-						hideAll();
-						return;
-					end;
-					local h = math.abs(pFeet.Y - pTop.Y);
-					if h < 4 then
-						h = 4;
-					end;
-					local w = h / 2;
-					local cx = pFeet.X;
-					local left = cx - w / 2;
-					local top = math.min(pTop.Y, pFeet.Y);
-					local boxColor = data.boxColor;
-					if typeof(boxColor) ~= "Color3" then
-						boxColor = Color3.fromRGB(255, 60, 80);
-					end;
-					if data.showBox ~= false then
-						edgeT.Position = UDim2.fromOffset(left, top);
-						edgeT.Size = UDim2.fromOffset(w, 1);
-						edgeT.BackgroundColor3 = boxColor;
-						edgeT.Visible = true;
-						edgeB.Position = UDim2.fromOffset(left, top + h);
-						edgeB.Size = UDim2.fromOffset(w, 1);
-						edgeB.BackgroundColor3 = boxColor;
-						edgeB.Visible = true;
-						edgeL.Position = UDim2.fromOffset(left, top);
-						edgeL.Size = UDim2.fromOffset(1, h);
-						edgeL.BackgroundColor3 = boxColor;
-						edgeL.Visible = true;
-						edgeR.Position = UDim2.fromOffset(left + w, top);
-						edgeR.Size = UDim2.fromOffset(1, h);
-						edgeR.BackgroundColor3 = boxColor;
-						edgeR.Visible = true;
-					else
-						edgeT.Visible = false;
-						edgeB.Visible = false;
-						edgeL.Visible = false;
-						edgeR.Visible = false;
-					end;
-					local pct = tonumber(data.healthPct) or 1;
-					if pct < 0 then
-						pct = 0;
-					end;
-					if pct > 1 then
-						pct = 1;
-					end;
-					if data.showHealth ~= false then
-						local hbC = data.healthColor;
-						if typeof(hbC) ~= "Color3" then
-							hbC = Color3.fromRGB(0, 255, 0);
-						end;
-						hbBg.Position = UDim2.fromOffset(left - 5, top);
-						hbBg.Size = UDim2.fromOffset(3, h);
-						hbBg.Visible = true;
-						hbFill.Position = UDim2.fromOffset(left - 5, top + h * (1 - pct));
-						hbFill.Size = UDim2.fromOffset(3, math.max(1, h * pct));
-						hbFill.BackgroundColor3 = hbC;
-						hbFill.Visible = true;
-					else
-						hbBg.Visible = false;
-						hbFill.Visible = false;
-					end;
-					if data.showName ~= false then
-						nameL.Position = UDim2.fromOffset(cx, top - 2);
-						nameL.Text = tostring(data.name or "");
-						nameL.Visible = true;
-					else
-						nameL.Visible = false;
-					end;
-					local sub = tostring(data.sub or "");
-					if data.showSub ~= false and sub ~= "" then
-						subL.Position = UDim2.fromOffset(cx, top + h + 2);
-						subL.Text = sub;
-						subL.Visible = true;
-					else
-						subL.Visible = false;
-					end;
-					if data.showTracer ~= false then
-						setTracer(Vector2.new(vs.X / 2, vs.Y), Vector2.new(cx, top + h), boxColor);
-					else
-						tracer.Visible = false;
-					end;
+			characterClone = clone;
+			local hrp = characterClone:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				pcall(function()
+					hrp.CFrame = CFrame.new(0, 0, 0)
 				end);
+				pcall(function()
+					vCam.CFrame = CFrame.new(Vector3.new(0, 2, 5), hrp.Position)
+				end);
+				Placeholder.Visible = false;
+			else
+				Placeholder.Visible = true;
+			end;
+		end;
+
+		pcall(function()
+			local player = Players.LocalPlayer;
+			if player then
+				if player.Character then
+					task.spawn(updateViewport, player.Character);
+				else
+					Placeholder.Visible = true;
+				end;
+				charAddedConn = player.CharacterAdded:Connect(updateViewport);
+			else
+				Placeholder.Visible = true;
 			end;
 		end);
 
@@ -3768,7 +3551,13 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 				Fatality:ProtectText(Title,new_name);
 			end,
 			Refresh = function()
-				wantRefresh = true;
+				pcall(function()
+					local player = Players.LocalPlayer;
+					local char = player and player.Character;
+					if char then
+						task.spawn(updateViewport, char);
+					end;
+				end);
 			end,
 			GetValue = function()
 				return {};
@@ -3777,6 +3566,11 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			Flag = Config.Flag and Config.Flag.."Preview",
 			Frame = Box,
 			Destroy = function()
+				pcall(function()
+					if charAddedConn then
+						charAddedConn:Disconnect()
+					end;
+				end);
 				pcall(function()
 					Box:Destroy();
 				end);
