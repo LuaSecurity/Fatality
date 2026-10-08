@@ -41,7 +41,7 @@ export type Listbox = {
 	Name: string,
 	Option: boolean,
 	Multi: boolean,
-	Position: string,	
+	Position: string,
 	Flag: string | nil,
 	Height: number,
 	Default: ValueBase,
@@ -3547,69 +3547,145 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		end;
 
 		local edgeT, edgeB, edgeL, edgeR = mkEdge(), mkEdge(), mkEdge(), mkEdge();
+		local outT, outB, outL, outR = mkEdge(), mkEdge(), mkEdge(), mkEdge();
+		outT.BackgroundColor3 = Color3.fromRGB(0, 0, 0);
+		outB.BackgroundColor3 = Color3.fromRGB(0, 0, 0);
+		outL.BackgroundColor3 = Color3.fromRGB(0, 0, 0);
+		outR.BackgroundColor3 = Color3.fromRGB(0, 0, 0);
+		local function mkGrad(parent, rotation)
+			local gr = Instance.new("UIGradient")
+			gr.Rotation = rotation or 0
+			gr.Enabled = false
+			gr.Parent = parent
+			return gr
+		end;
+		local gradL, gradR = mkGrad(edgeL, 90), mkGrad(edgeR, 90);
 		local hbBg, hbFill = mkEdge(), mkEdge();
 		hbBg.BackgroundColor3 = Color3.fromRGB(20, 20, 20);
+		local gradH = mkGrad(hbFill, 90);
+		local ammoBg, ammoFill = mkEdge(), mkEdge();
+		ammoBg.BackgroundColor3 = Color3.fromRGB(20, 20, 20);
+		local gradA = mkGrad(ammoFill, 0);
 
-		local function mkTopLabel(h)
+		local function mkTopLabel(h, ts)
 			local l = Instance.new("TextLabel")
 			l.BackgroundTransparency = 1.000
 			l.AnchorPoint = Vector2.new(0.5, 1)
 			l.Size = UDim2.new(1, -10, 0, h)
 			l.ZIndex = ZIndex + 4
-			l.FontFace = Fatality.FontSemiBold
+			l.Font = Enum.Font.GothamBold
 			l.TextColor3 = Color3.fromRGB(255, 255, 255)
-			l.TextSize = 13.000
+			l.TextSize = ts or 13.000
 			l.TextStrokeTransparency = 0.500
 			l.Visible = false
 			l.Parent = View
 			return l
 		end;
 
-		local function mkBottomLabel(h)
+		local function mkBottomLabel(h, ts)
 			local l = Instance.new("TextLabel")
 			l.BackgroundTransparency = 1.000
 			l.AnchorPoint = Vector2.new(0.5, 0)
 			l.Size = UDim2.new(1, -10, 0, h)
 			l.ZIndex = ZIndex + 4
-			l.FontFace = Fatality.FontSemiBold
+			l.Font = Enum.Font.GothamBold
 			l.TextColor3 = Color3.fromRGB(255, 255, 255)
-			l.TextSize = 12.000
+			l.TextSize = ts or 12.000
 			l.TextStrokeTransparency = 0.500
 			l.Visible = false
 			l.Parent = View
 			return l
 		end;
 
-		local nameL, subL = mkTopLabel(14), mkTopLabel(13);
-		local itemL, ammoL = mkBottomLabel(13), mkBottomLabel(13);
+		local nameL, subL = mkTopLabel(14, 13), mkTopLabel(13, 12);
+		local itemL = mkBottomLabel(13, 12);
 
-		local infoL = Instance.new("TextLabel")
-		infoL.BackgroundTransparency = 1.000
-		infoL.AnchorPoint = Vector2.new(0, 0)
-		infoL.Size = UDim2.new(0, 150, 0, 120)
-		infoL.ZIndex = ZIndex + 4
-		infoL.FontFace = Fatality.FontSemiBold
-		infoL.TextColor3 = Color3.fromRGB(255, 255, 255)
-		infoL.TextSize = 12.000
-		infoL.TextStrokeTransparency = 0.500
-		infoL.TextXAlignment = Enum.TextXAlignment.Left
-		infoL.TextYAlignment = Enum.TextYAlignment.Top
-		infoL.RichText = true
-		infoL.Visible = false
-		infoL.Parent = View
+		-- === ESP-PREVIEW-SYNC: skeleton / arrow demo elements.
+		-- Bone list mirrors H.Skeleton.BONES in ArchHook.lua; glyphs arrive
+		-- via data.arrowGlyph (mirrors H.Arrow.GLYPHS). Provider fields come
+		-- from the ESP preview data (search ESP-PREVIEW-SYNC in ArchHook.lua).
+		local SKEL_BONES = {
+			{ "Head", "UpperTorso" },
+			{ "UpperTorso", "LowerTorso" },
+			{ "UpperTorso", "LeftUpperArm" },
+			{ "LeftUpperArm", "LeftLowerArm" },
+			{ "LeftLowerArm", "LeftHand" },
+			{ "UpperTorso", "RightUpperArm" },
+			{ "RightUpperArm", "RightLowerArm" },
+			{ "RightLowerArm", "RightHand" },
+			{ "LowerTorso", "LeftUpperLeg" },
+			{ "LeftUpperLeg", "LeftLowerLeg" },
+			{ "LeftLowerLeg", "LeftFoot" },
+			{ "LowerTorso", "RightUpperLeg" },
+			{ "RightUpperLeg", "RightLowerLeg" },
+			{ "RightLowerLeg", "RightFoot" },
+		};
+		local skelLines = {};
+		for i = 1, #SKEL_BONES do
+			skelLines[i] = mkEdge();
+		end;
+		local arrowL = Instance.new("TextLabel")
+		arrowL.BackgroundTransparency = 1.000
+		arrowL.AnchorPoint = Vector2.new(0.5, 0.5)
+		arrowL.Size = UDim2.new(0, 60, 0, 60)
+		arrowL.ZIndex = ZIndex + 4
+		arrowL.Font = Enum.Font.GothamBlack
+		arrowL.TextSize = 28.000
+		arrowL.TextStrokeTransparency = 0.500
+		arrowL.Visible = false
+		arrowL.Parent = View
+		local arrowDistL = Instance.new("TextLabel")
+		arrowDistL.BackgroundTransparency = 1.000
+		arrowDistL.AnchorPoint = Vector2.new(0.5, 0)
+		arrowDistL.Size = UDim2.new(0, 80, 0, 14)
+		arrowDistL.ZIndex = ZIndex + 4
+		arrowDistL.Font = Enum.Font.GothamBold
+		arrowDistL.TextSize = 12.000
+		arrowDistL.TextStrokeTransparency = 0.500
+		arrowDistL.Visible = false
+		arrowDistL.Parent = View
+
+		local infoLs = {};
+		for i = 1, 7 do
+			local fl = Instance.new("TextLabel")
+			fl.BackgroundTransparency = 1.000
+			fl.AnchorPoint = Vector2.new(0, 0)
+			fl.Size = UDim2.fromOffset(160, 13)
+			fl.ZIndex = ZIndex + 4
+			fl.Font = Enum.Font.GothamBold
+			fl.TextColor3 = Color3.fromRGB(255, 255, 255)
+			fl.TextSize = 12.000
+			fl.TextStrokeTransparency = 0.500
+			fl.TextXAlignment = Enum.TextXAlignment.Left
+			fl.Visible = false
+			fl.Parent = View
+			infoLs[i] = fl;
+		end;
 
 		local function hideOverlay()
 			edgeT.Visible = false;
 			edgeB.Visible = false;
 			edgeL.Visible = false;
 			edgeR.Visible = false;
+			outT.Visible = false;
+			outB.Visible = false;
+			outL.Visible = false;
+			outR.Visible = false;
 			hbBg.Visible = false;
 			hbFill.Visible = false;
 			nameL.Visible = false;
 			subL.Visible = false;
 			itemL.Visible = false;
-			ammoL.Visible = false;
-			infoL.Visible = false;
+			ammoBg.Visible = false;
+			ammoFill.Visible = false;
+			for i = 1, 7 do
+				infoLs[i].Visible = false;
+			end;
+			for i = 1, #skelLines do
+				skelLines[i].Visible = false;
+			end;
+			arrowL.Visible = false;
+			arrowDistL.Visible = false;
 		end;
 
 		local function colOf(v, fallback)
@@ -3617,6 +3693,40 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 				return v;
 			end;
 			return fallback;
+		end;
+
+		-- === ESP-PREVIEW-SYNC: ViewportFrame has no engine projection for its
+		-- camera, so project clone parts manually (vCam CFrame + FOV against
+		-- View.AbsoluteSize). Returns nil when behind the camera.
+		local function projectToView(worldPos)
+			local ok, rel = pcall(function()
+				return vCam.CFrame:PointToObjectSpace(worldPos)
+			end);
+			if not ok or not rel or rel.Z >= -0.01 then
+				return nil;
+			end;
+			local pvs = View.AbsoluteSize;
+			if pvs.Y < 1 then
+				return nil;
+			end;
+			local f = (pvs.Y / 2) / math.tan(math.rad(vCam.FieldOfView) / 2);
+			local inv = 1 / -rel.Z;
+			return Vector2.new(pvs.X / 2 + rel.X * inv * f, pvs.Y / 2 - rel.Y * inv * f);
+		end;
+
+		local function setLine(f, ax, ay, bx, by, thick, color)
+			local dx, dy = bx - ax, by - ay;
+			local len = math.sqrt(dx * dx + dy * dy);
+			if len < 0.5 then
+				f.Visible = false;
+				return;
+			end;
+			f.AnchorPoint = Vector2.new(0.5, 0.5);
+			f.Position = UDim2.fromOffset((ax + bx) / 2, (ay + by) / 2);
+			f.Size = UDim2.fromOffset(len, thick);
+			f.Rotation = math.deg(math.atan2(dy, dx));
+			f.BackgroundColor3 = color;
+			f.Visible = true;
 		end;
 
 		local function drawOverlay(hrp)
@@ -3630,47 +3740,170 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 				hideOverlay();
 				return;
 			end;
-			local h = vs.Y * 0.78;
-			local w = vs.X * 0.30 * (0.65 + 0.35 * math.abs(math.cos(lastTheta)));
-			if w < 8 then
-				w = 8;
+			-- === ESP-PREVIEW-SYNC: box bounds mirror live H.ESP.GetBodyBounds
+			-- exactly. Every non-accessory BasePart corner is projected through
+			-- projectToView (the ViewportFrame equivalent of
+			-- cam:WorldToViewportPoint), then the SAME pad/floor/clamp math as
+			-- live runs (pad 2, min 4px, clamp to viewport). No fake width: as
+			-- the clone rotates the box breathes exactly like the in-game box.
+			local x0, y0, x1, y1 = nil, nil, nil, nil;
+			if characterClone and characterClone.Parent then
+				local descs = nil;
+				pcall(function()
+					descs = characterClone:GetDescendants();
+				end);
+				if type(descs) == "table" then
+					for i = 1, #descs do
+						local d = descs[i];
+						local isPart = false;
+						pcall(function()
+							isPart = d:IsA("BasePart");
+						end);
+						if isPart then
+							local inAcc = false;
+							pcall(function()
+								inAcc = d:FindFirstAncestorOfClass("Accessory") ~= nil;
+							end);
+							if not inAcc then
+								local cf, sz = nil, nil;
+								pcall(function()
+									cf = d.CFrame;
+									sz = d.Size;
+								end);
+								if cf and sz then
+									local hx, hy, hz = sz.X * 0.5, sz.Y * 0.5, sz.Z * 0.5;
+									for ax = -1, 1, 2 do
+										for ay = -1, 1, 2 do
+											for az = -1, 1, 2 do
+												local wp = nil;
+												pcall(function()
+													wp = cf * Vector3.new(hx * ax, hy * ay, hz * az);
+												end);
+												if wp then
+													local sp = projectToView(wp);
+													if sp then
+														if x0 == nil or sp.X < x0 then
+															x0 = sp.X;
+														end;
+														if x1 == nil or sp.X > x1 then
+															x1 = sp.X;
+														end;
+														if y0 == nil or sp.Y < y0 then
+															y0 = sp.Y;
+														end;
+														if y1 == nil or sp.Y > y1 then
+															y1 = sp.Y;
+														end;
+													end;
+												end;
+											end;
+										end;
+									end;
+								end;
+							end;
+						end;
+					end;
+				end;
 			end;
-			local cx = vs.X / 2;
-			local left = cx - w / 2;
-			local top = (vs.Y - h) / 2;
+			if x0 == nil then
+				hideOverlay();
+				return;
+			end;
+			local pad = 2;
+			local h = math.floor((y1 - y0) + pad * 2);
+			if h < 4 then
+				h = 4;
+			end;
+			local w = math.floor((x1 - x0) + pad * 2);
+			if w < 4 then
+				w = 4;
+			end;
+			if h > vs.Y then
+				h = math.floor(vs.Y);
+			end;
+			if w > vs.X then
+				w = math.floor(vs.X);
+			end;
+			local cx = (x0 + x1) / 2;
+			local left = math.floor(cx - w / 2);
+			local top = math.floor(y0 - pad);
 			if data.showBox ~= false then
-				local cT, cB, cM;
+				local bt = 2
+				outT.Position = UDim2.fromOffset(left - 1, top - 1);
+				outT.Size = UDim2.fromOffset(w + 2, 1);
+				outT.Visible = true;
+				outB.Position = UDim2.fromOffset(left - 1, top + h);
+				outB.Size = UDim2.fromOffset(w + 2, 1);
+				outB.Visible = true;
+				outL.Position = UDim2.fromOffset(left - 1, top - 1);
+				outL.Size = UDim2.fromOffset(1, h + 2);
+				outL.Visible = true;
+				outR.Position = UDim2.fromOffset(left + w, top - 1);
+				outR.Size = UDim2.fromOffset(1, h + 2);
+				outR.Visible = true;
+				edgeT.Position = UDim2.fromOffset(left, top);
+				edgeT.Size = UDim2.fromOffset(w, bt);
+				edgeT.Visible = true;
+				edgeB.Position = UDim2.fromOffset(left, top + h - bt);
+				edgeB.Size = UDim2.fromOffset(w, bt);
+				edgeB.Visible = true;
+				edgeL.Position = UDim2.fromOffset(left, top + bt);
+				edgeL.Size = UDim2.fromOffset(bt, h - bt * 2);
+				edgeL.Visible = true;
+				edgeR.Position = UDim2.fromOffset(left + w - bt, top + bt);
+				edgeR.Size = UDim2.fromOffset(bt, h - bt * 2);
+				edgeR.Visible = true;
+				local cT, cB;
 				if data.boxStyle == "Gradient" then
 					cT = colOf(data.boxTop, Color3.fromRGB(255, 60, 80));
 					cB = colOf(data.boxBottom, Color3.fromRGB(255, 60, 80));
+					local seq = ColorSequence.new({
+						ColorSequenceKeypoint.new(0, cT),
+						ColorSequenceKeypoint.new(1, cB),
+					});
+					gradL.Enabled = true;
+					gradL.Color = seq;
+					gradR.Enabled = true;
+					gradR.Color = seq;
+					edgeL.BackgroundColor3 = Color3.fromRGB(255, 255, 255);
+					edgeR.BackgroundColor3 = Color3.fromRGB(255, 255, 255);
 				else
 					cT = colOf(data.boxColor, Color3.fromRGB(255, 60, 80));
 					cB = cT;
+					gradL.Enabled = false;
+					gradR.Enabled = false;
+					edgeL.BackgroundColor3 = cT;
+					edgeR.BackgroundColor3 = cT;
 				end;
-				cM = cT:Lerp(cB, 0.5);
-				edgeT.Position = UDim2.fromOffset(left, top);
-				edgeT.Size = UDim2.fromOffset(w, 1);
 				edgeT.BackgroundColor3 = cT;
-				edgeT.Visible = true;
-				edgeB.Position = UDim2.fromOffset(left, top + h);
-				edgeB.Size = UDim2.fromOffset(w, 1);
 				edgeB.BackgroundColor3 = cB;
-				edgeB.Visible = true;
-				edgeL.Position = UDim2.fromOffset(left, top);
-				edgeL.Size = UDim2.fromOffset(1, h);
-				edgeL.BackgroundColor3 = cM;
-				edgeL.Visible = true;
-				edgeR.Position = UDim2.fromOffset(left + w, top);
-				edgeR.Size = UDim2.fromOffset(1, h);
-				edgeR.BackgroundColor3 = cM;
-				edgeR.Visible = true;
 			else
 				edgeT.Visible = false;
 				edgeB.Visible = false;
 				edgeL.Visible = false;
 				edgeR.Visible = false;
+				outT.Visible = false;
+				outB.Visible = false;
+				outL.Visible = false;
+				outR.Visible = false;
 			end;
-			local pct = tonumber(data.healthPct);
+			-- Animated bars: ping-pong full -> empty -> full (4s each way).
+			-- Health and ammo run 4s out of phase so both extremes are visible
+			-- at once. Bar DRAWING below matches live H.StartESP exactly; only
+			-- the pct source differs (live = Humanoid.Health / ammo count).
+			local animH, animA = nil, nil;
+			if data.animateBars ~= false then
+				local function ping(offset)
+					local c = (tick() + (offset or 0)) % 8;
+					if c < 4 then
+						return 1 - c / 4;
+					end;
+					return (c - 4) / 4;
+				end;
+				animH = ping(0);
+				animA = ping(4);
+			end;
+			local pct = animH or tonumber(data.healthPct);
 			if pct == nil then
 				pct = 1;
 			end;
@@ -3683,19 +3916,23 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			if data.showHealth ~= false then
 				local hFull = colOf(data.healthFull, Color3.fromRGB(0, 255, 0));
 				local hEmpty = colOf(data.healthEmpty, Color3.fromRGB(255, 0, 0));
-				local hCol;
-				if data.healthStyle == "Gradient" then
-					hCol = hEmpty:Lerp(hFull, pct);
-				else
-					hCol = colOf(data.healthColor, hEmpty:Lerp(hFull, pct));
-				end;
-				hbBg.Position = UDim2.fromOffset(left - 5, top);
+				hbBg.Position = UDim2.fromOffset(left - 6, top);
 				hbBg.Size = UDim2.fromOffset(3, h);
 				hbBg.Visible = true;
-				hbFill.Position = UDim2.fromOffset(left - 5, top + h * (1 - pct));
+				hbFill.Position = UDim2.fromOffset(left - 6, top + h * (1 - pct));
 				hbFill.Size = UDim2.fromOffset(3, math.max(1, h * pct));
-				hbFill.BackgroundColor3 = hCol;
 				hbFill.Visible = true;
+				if data.healthStyle == "Gradient" then
+					gradH.Enabled = true;
+					gradH.Color = ColorSequence.new({
+						ColorSequenceKeypoint.new(0, hFull),
+						ColorSequenceKeypoint.new(1, hEmpty),
+					});
+					hbFill.BackgroundColor3 = Color3.fromRGB(255, 255, 255);
+				else
+					gradH.Enabled = false;
+					hbFill.BackgroundColor3 = colOf(data.healthColor, hEmpty:Lerp(hFull, pct));
+				end;
 			else
 				hbBg.Visible = false;
 				hbFill.Visible = false;
@@ -3737,46 +3974,147 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			else
 				itemL.Visible = false;
 			end;
-			if data.showAmmo and tostring(data.ammoText or "") ~= "" then
-				local aPct = tonumber(data.ammoPct);
+			if data.showAmmo and tonumber(data.ammoMax) and tonumber(data.ammoMax) > 0 then
+				local aPct = animA or tonumber(data.ammoPct);
 				if aPct == nil then
 					aPct = 1;
 				end;
-				local aCol;
+				if aPct < 0 then
+					aPct = 0;
+				end;
+				if aPct > 1 then
+					aPct = 1;
+				end;
+				ammoBg.Position = UDim2.fromOffset(left, by);
+				ammoBg.Size = UDim2.fromOffset(w, 3);
+				ammoBg.Visible = true;
+				ammoFill.Position = UDim2.fromOffset(left, by);
+				ammoFill.Size = UDim2.fromOffset(math.max(1, w * aPct), 3);
+				ammoFill.Visible = true;
 				if data.ammoStyle == "Gradient" then
 					local aFull = colOf(data.ammoFull, Color3.fromRGB(0, 255, 0));
 					local aEmpty = colOf(data.ammoEmpty, Color3.fromRGB(255, 0, 0));
-					aCol = aEmpty:Lerp(aFull, math.clamp(aPct, 0, 1));
+					gradA.Enabled = true;
+					gradA.Color = ColorSequence.new({
+						ColorSequenceKeypoint.new(0, aFull),
+						ColorSequenceKeypoint.new(1, aEmpty),
+					});
+					ammoFill.BackgroundColor3 = Color3.fromRGB(255, 255, 255);
 				else
-					aCol = colOf(data.ammoColor, Color3.fromRGB(255, 255, 255));
+					gradA.Enabled = false;
+					ammoFill.BackgroundColor3 = colOf(data.ammoColor, Color3.fromRGB(255, 255, 255));
 				end;
-				ammoL.Position = UDim2.fromOffset(cx, by);
-				ammoL.Text = tostring(data.ammoText or "");
-				ammoL.TextColor3 = aCol;
-				ammoL.Visible = true;
 			else
-				ammoL.Visible = false;
+				ammoBg.Visible = false;
+				ammoFill.Visible = false;
 			end;
-			if data.showInfo ~= false and type(data.info) == "table" and #data.info > 0 then
-				local lines = {};
+			if data.showInfo ~= false and type(data.info) == "table" then
+				-- LOW HP mirrors the live hpct <= 0.25 gate: hidden while the
+				-- animated health bar is high (else bar + flag contradict).
+				-- Kept when it is the ONLY row so the slot is never empty.
+				local visible = {};
 				for _, entry in ipairs(data.info) do
 					if type(entry) == "table" and entry.text then
-						local c = colOf(entry.color, Color3.fromRGB(255, 255, 255));
-						local r = math.floor(c.R * 255 + 0.5);
-						local g = math.floor(c.G * 255 + 0.5);
-						local b = math.floor(c.B * 255 + 0.5);
-						table.insert(lines, string.format('<font color="rgb(%d,%d,%d)">%s</font>', r, g, b, tostring(entry.text)));
+						local k = entry.key or tostring(entry.text);
+						if k == "Low health" or entry.text == "LOW HP" then
+							if pct <= 0.25 or #data.info == 1 then
+								table.insert(visible, entry);
+							end;
+						else
+							table.insert(visible, entry);
+						end;
 					end;
 				end;
-				if #lines > 0 then
-					infoL.Position = UDim2.fromOffset(left + w + 4, top);
-					infoL.Text = table.concat(lines, "\n");
-					infoL.Visible = true;
-				else
-					infoL.Visible = false;
+				for i = 1, 7 do
+					local fl = infoLs[i];
+					local entry = visible[i];
+					if type(entry) == "table" and entry.text then
+						fl.Position = UDim2.fromOffset(left + w + 5, top + (i - 1) * 13);
+						fl.Text = tostring(entry.text);
+						fl.TextColor3 = colOf(entry.color, Color3.fromRGB(255, 255, 255));
+						fl.Visible = true;
+					else
+						fl.Visible = false;
+					end;
 				end;
 			else
-				infoL.Visible = false;
+				for i = 1, 7 do
+					infoLs[i].Visible = false;
+				end;
+			end;
+			-- === ESP-PREVIEW-SYNC: skeleton, drawn from the real clone-bone
+			-- projection so thickness/color match the live H.Skeleton.Draw.
+			if data.showSkeleton == true and characterClone and characterClone.Parent then
+				local skCol = colOf(data.skeletonColor, Color3.fromRGB(255, 255, 255));
+				local skThick = tonumber(data.skeletonThickness) or 1;
+				if skThick < 1 then
+					skThick = 1;
+				end;
+				if skThick > 6 then
+					skThick = 6;
+				end;
+				for i, bone in ipairs(SKEL_BONES) do
+					local f = skelLines[i];
+					local a = characterClone:FindFirstChild(bone[1]);
+					local b = characterClone:FindFirstChild(bone[2]);
+					if a and b and a:IsA("BasePart") and b:IsA("BasePart") then
+						local pa = projectToView(a.Position);
+						local pb = projectToView(b.Position);
+						if pa and pb then
+							setLine(f, pa.X, pa.Y, pb.X, pb.Y, skThick, skCol);
+						else
+							f.Visible = false;
+						end;
+					else
+						f.Visible = false;
+					end;
+				end;
+			else
+				for i = 1, #skelLines do
+					skelLines[i].Visible = false;
+				end;
+			end;
+			-- === ESP-PREVIEW-SYNC: offscreen arrow demo. The clone is always
+			-- on-screen, so park a sample arrow at the configured radius
+			-- pointing east; rotation mirrors live H.Arrow.Update math.
+			if data.showArrow == true then
+				local dirX, dirY = 1, 0;
+				local radius = tonumber(data.arrowRadius) or 180;
+				local maxR = math.min(vs.X, vs.Y) / 2 - 40;
+				if maxR < 40 then
+					maxR = 40;
+				end;
+				if radius > maxR then
+					radius = maxR;
+				end;
+				if radius < 40 then
+					radius = 40;
+				end;
+				local ax = vs.X / 2 + dirX * radius;
+				local ay = vs.Y / 2 + dirY * radius;
+				local style = tostring(data.arrowStyle or "Triangle");
+				local rot = math.deg(math.atan2(dirY, dirX)) + 90;
+				if style == "Diamond" then
+					rot = 0;
+				end;
+				arrowL.Position = UDim2.fromOffset(ax, ay);
+				arrowL.Text = tostring(data.arrowGlyph or "▲");
+				arrowL.TextColor3 = colOf(data.arrowColor, Color3.fromRGB(255, 60, 80));
+				arrowL.TextSize = tonumber(data.arrowSize) or 28;
+				arrowL.Size = UDim2.new(0, arrowL.TextSize + 32, 0, arrowL.TextSize + 32);
+				arrowL.Rotation = rot;
+				arrowL.Visible = true;
+				if data.arrowShowDistance ~= false then
+					arrowDistL.Position = UDim2.fromOffset(ax, ay + 22);
+					arrowDistL.Text = "87m";
+					arrowDistL.TextColor3 = colOf(data.arrowColor, Color3.fromRGB(255, 60, 80));
+					arrowDistL.Visible = true;
+				else
+					arrowDistL.Visible = false;
+				end;
+			else
+				arrowL.Visible = false;
+				arrowDistL.Visible = false;
 			end;
 		end;
 
