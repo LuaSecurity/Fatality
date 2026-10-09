@@ -1,4 +1,4 @@
---[[
+]--[[
     		Fatality-Dark Interface
 
     Author: 4lpaca
@@ -139,7 +139,13 @@ export type Slider = {
 	Callback: (number) -> any,
 	Risky: boolean,
 	Flag: string | nil,
-	Option: boolean
+	Option: boolean,
+	-- Opt-in "Auto" stop past Max (e.g. hit-chance 0-100% + Auto): the last
+	-- track stop displays AutoText at full bar and the callback receives the
+	-- AutoText string instead of a number. All other sliders behave exactly
+	-- as before when Auto is absent/false.
+	Auto: boolean?,
+	AutoText: string?,
 }
 
 export type Button = {
@@ -1934,6 +1940,8 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		Config.Round = Config.Round or 0;
 		Config.Risky = Config.Risky or false;
 		Config.Option = Config.Option or false;
+		Config.Auto = Config.Auto or false;
+		Config.AutoText = Config.AutoText or "Auto";
 		Config.Callback = Config.Callback or function(number) end;
 		Config.Flag = Config.Flag or nil;
 
@@ -2011,7 +2019,11 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		boxli.BackgroundColor3 = Fatality.Colors.Main
 		boxli.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		boxli.BorderSizePixel = 0
-		boxli.Size = UDim2.new((Config.Default - Config.Min) / (Config.Max - Config.Min), 0, 1, 0)
+		if Config.Auto and Config.Default == Config.AutoText then
+			boxli.Size = UDim2.new(1, 0, 1, 0)
+		else
+			boxli.Size = UDim2.new((Config.Default - Config.Min) / (Config.Max - Config.Min), 0, 1, 0)
+		end
 		boxli.ZIndex = ZIndex + 3
 
 		UICorner_2.CornerRadius = UDim.new(0, 2)
@@ -2026,7 +2038,11 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 		ValueText.Size = UDim2.new(1, 0, 1, 0)
 		ValueText.ZIndex = ZIndex + 4
 		ValueText.FontFace = Fatality.FontSemiBold
-		ValueText.Text = string.format('%s%s',tostring(Config.Default),tostring(Config.Type));
+		if Config.Auto and Config.Default == Config.AutoText then
+			ValueText.Text = tostring(Config.AutoText);
+		else
+			ValueText.Text = string.format('%s%s',tostring(Config.Default),tostring(Config.Type));
+		end
 		ValueText.TextColor3 = Color3.fromRGB(255, 255, 255)
 		ValueText.TextSize = 9.000
 		ValueText.TextStrokeTransparency = 0.850;
@@ -2084,19 +2100,47 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 
 		local function update(Input)
 			local SizeScale = math.clamp((((Input.Position.X) - ValueFrame.AbsolutePosition.X) / ValueFrame.AbsoluteSize.X), 0, 1);
-			local Main = ((Config.Max - Config.Min) * SizeScale) + Config.Min;
-			local Value = Fatality:Rounding(Main,Config.Round);
-			local PositionX = UDim2.fromScale(SizeScale, 1);
-			local normalized = (Value - Config.Min) / (Config.Max - Config.Min);
+			-- Auto stop: numeric stops 0..N fill the track, one extra stop at
+			-- the very end displays AutoText (pushing "past Max" lands Auto).
+			local Value = nil;
+			local IsAuto = false;
+			if Config.Auto then
+				local step = 10 ^ -(Config.Round or 0);
+				local numericStops = math.max(1, math.floor((Config.Max - Config.Min) / step + 0.5));
+				-- Numeric stops 0..numericStops (values Min..Max) plus one Auto
+				-- stop past the last numeric stop.
+				local idx = math.floor(SizeScale * (numericStops + 1) + 0.5);
+				if idx > numericStops then
+					IsAuto = true;
+				else
+					Value = Fatality:Rounding(Config.Min + idx * step, Config.Round);
+				end;
+			else
+				local Main = ((Config.Max - Config.Min) * SizeScale) + Config.Min;
+				Value = Fatality:Rounding(Main,Config.Round);
+			end;
+			local normalized = 1;
+			if not IsAuto then
+				normalized = (Value - Config.Min) / (Config.Max - Config.Min);
+			end;
 
 			TweenService:Create(boxli , TweenInfo.new(0.2),{
 				Size = UDim2.new(normalized, 0, 1, 0)
 			}):Play();
 
-			Config.Default = Value;
-			ValueText.Text = string.format('%s%s',tostring(Config.Default),tostring(Config.Type));
+			if IsAuto then
+				Config.Default = Config.AutoText;
+				ValueText.Text = tostring(Config.AutoText);
+			else
+				Config.Default = Value;
+				ValueText.Text = string.format('%s%s',tostring(Config.Default),tostring(Config.Type));
+			end;
 
-			Config.Callback(Value)
+			if IsAuto then
+				Config.Callback(Config.AutoText)
+			else
+				Config.Callback(Value)
+			end
 		end;
 
 		do
@@ -2147,14 +2191,24 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			SetValue = function(v)
 				local IsSame = v == Config.Default;
 
-				Config.Default = v;
+				if Config.Auto and v == Config.AutoText then
+					Config.Default = Config.AutoText;
 
-				TweenService:Create(boxli , TweenInfo.new(0.2),{
-					Size = UDim2.new((Config.Default - Config.Min) / (Config.Max - Config.Min), 0, 1, 0)
-				}):Play();
+					TweenService:Create(boxli , TweenInfo.new(0.2),{
+						Size = UDim2.new(1, 0, 1, 0)
+					}):Play();
 
-				Config.Default = v;
-				ValueText.Text = string.format('%s%s',tostring(Config.Default),tostring(Config.Type));
+					ValueText.Text = tostring(Config.AutoText);
+				else
+					Config.Default = v;
+
+					TweenService:Create(boxli , TweenInfo.new(0.2),{
+						Size = UDim2.new((Config.Default - Config.Min) / (Config.Max - Config.Min), 0, 1, 0)
+					}):Play();
+
+					Config.Default = v;
+					ValueText.Text = string.format('%s%s',tostring(Config.Default),tostring(Config.Type));
+				end;
 
 				if not IsSame then
 					Config.Callback(v);
@@ -3661,6 +3715,18 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 
 		local nameL, subL = mkTopLabel(14, 13), mkTopLabel(13, 12);
 		local itemL = mkBottomLabel(13, 12);
+		local itemIcon = Instance.new("ImageLabel")
+		itemIcon.BackgroundTransparency = 1.000
+		itemIcon.AnchorPoint = Vector2.new(0.5, 0)
+		itemIcon.Size = UDim2.new(0, 56, 0, 40)
+		itemIcon.ScaleType = Enum.ScaleType.Fit
+		itemIcon.ZIndex = ZIndex + 4
+		itemIcon.Visible = false
+		itemIcon.Parent = View
+		local gradIcon = Instance.new("UIGradient")
+		gradIcon.Rotation = 0
+		gradIcon.Enabled = false
+		gradIcon.Parent = itemIcon
 
 		-- === ESP-PREVIEW-SYNC: skeleton / arrow demo elements.
 		-- Bone list mirrors H.Skeleton.BONES in ArchHook.lua; glyphs arrive
@@ -3738,6 +3804,8 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 			nameL.Visible = false;
 			subL.Visible = false;
 			itemL.Visible = false;
+			itemIcon.Visible = false;
+			gradIcon.Enabled = false;
 			ammoBg.Visible = false;
 			ammoFill.Visible = false;
 			for i = 1, 7 do
@@ -4052,14 +4120,6 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 				subL.Visible = false;
 			end;
 			local by = top + h + 2;
-			if data.showItem then
-				itemL.Position = UDim2.fromOffset(cx, by);
-				setTxt(itemL, tostring(data.itemText or ""), colOf(data.itemColor, Color3.fromRGB(255, 255, 255)));
-				itemL.Visible = true;
-				by = by + 13;
-			else
-				itemL.Visible = false;
-			end;
 			if data.showAmmo and tonumber(data.ammoMax) and tonumber(data.ammoMax) > 0 then
 				local aPct = animA or tonumber(data.ammoPct);
 				if aPct == nil then
@@ -4090,9 +4150,57 @@ function Fatality:CreateElements(Parent : Frame , ZIndex : number , Event : Bind
 					gradA.Enabled = false;
 					ammoFill.BackgroundColor3 = colOf(data.ammoColor, Color3.fromRGB(255, 255, 255));
 				end;
+				by = by + 5;
 			else
 				ammoBg.Visible = false;
 				ammoFill.Visible = false;
+			end;
+			if data.showItem then
+				itemL.Position = UDim2.fromOffset(cx, by);
+				setTxt(itemL, tostring(data.itemText or ""), colOf(data.itemColor, Color3.fromRGB(255, 255, 255)));
+				itemL.Visible = true;
+				by = by + 13;
+			else
+				itemL.Visible = false;
+			end;
+			if data.showItemIcon == true and type(data.itemIcon) == "string" and data.itemIcon ~= "" then
+				local ih = math.clamp(tonumber(data.itemIconH) or 44, 40, 56);
+				local iw = math.clamp(tonumber(data.itemIconW) or 64, 44, 104);
+				iw = math.min(iw, math.max(w + 24, 56));
+				itemIcon.Size = UDim2.new(0, iw, 0, ih);
+				-- Tucked up under the name (overlaps the name row a touch).
+				itemIcon.Position = UDim2.fromOffset(cx, by - 11);
+				if itemIcon.Image ~= data.itemIcon then
+					itemIcon.Image = data.itemIcon;
+				end;
+				itemIcon.ImageColor3 = colOf(data.itemIconColor, Color3.fromRGB(255, 255, 255));
+				itemIcon.Visible = true;
+				by = by + ih + 1 - 11;
+			else
+				itemIcon.Visible = false;
+			end;
+			if data.showItemIconAmmo == true and itemIcon.Visible then
+				local iPct = animA or tonumber(data.ammoPct);
+				if iPct == nil then
+					iPct = 1;
+				end;
+				if iPct < 0 then
+					iPct = 0;
+				end;
+				if iPct > 1 then
+					iPct = 1;
+				end;
+				local full = colOf(data.itemIconFull, Color3.fromRGB(0, 255, 0));
+				local empty = colOf(data.itemIconEmpty, Color3.fromRGB(255, 0, 0));
+				gradIcon.Enabled = true;
+				gradIcon.Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, full),
+					ColorSequenceKeypoint.new(iPct, full),
+					ColorSequenceKeypoint.new(iPct, empty),
+					ColorSequenceKeypoint.new(1, empty),
+				});
+			else
+				gradIcon.Enabled = false;
 			end;
 			if data.showInfo ~= false and type(data.info) == "table" then
 				-- LOW HP mirrors the live hpct <= 0.25 gate: hidden while the
