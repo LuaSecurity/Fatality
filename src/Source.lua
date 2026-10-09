@@ -1,4 +1,4 @@
-]--[[
+--[[
     		Fatality-Dark Interface
 
     Author: 4lpaca
